@@ -19,10 +19,9 @@ reports/
 *.swo
 *~
 
-# Secrets and data
+# Secrets
 AnthropicKey.txt
 .env
-kernel_developers_emails_1.csv
 
 # OS files
 Thumbs.db

@@ -24,6 +24,7 @@ COPY models.py .
 COPY activity_classifier.py .
 COPY thread_analyzer.py .
 COPY report_generator.py .
+COPY kernel_developers_emails_1.csv .
 
 # Copy entrypoint script and fix Windows line endings
 COPY docker-entrypoint.sh /docker-entrypoint.sh
