@@ -3,3 +3,4 @@ __pycache__/
 .llm_cache/
 reports/
 .claude/
+kernel_developers_emails_1.csv

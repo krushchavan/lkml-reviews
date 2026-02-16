@@ -7,6 +7,7 @@ services:
     volumes:
       - ./reports:/app/reports
       - ./.llm_cache:/app/.llm_cache
+      - ./kernel_developers_emails_1.csv:/app/kernel_developers_emails_1.csv:ro
     environment:
       # Required only for Anthropic backend (--llm-backend anthropic or --llm-all)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
