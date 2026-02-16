@@ -7,6 +7,7 @@ services:
     volumes:
       - ./reports:/app/reports
       - ./.llm_cache:/app/.llm_cache
+      - ./logs:/app/logs
     environment:
       # Required only for Anthropic backend (--llm-backend anthropic or --llm-all)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -14,10 +15,13 @@ services:
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       # Cron mode: daily at 2:00 AM UTC, reports on previous day (the default)
       - CRON_SCHEDULE=${CRON_SCHEDULE:-0 2 * * *}
-      # CLI flags for generate_report.py in cron mode (default: Ollama LLM)
-      - REPORT_ARGS=${REPORT_ARGS:---llm}
+      # CLI flags for generate_report.py in cron mode (default: Ollama LLM, verbose)
+      - REPORT_ARGS=${REPORT_ARGS:---llm --verbose}
       # Run a report immediately on container start (cron mode only)
       - RUN_ON_STARTUP=${RUN_ON_STARTUP:-false}
+      # Linux: set to your user/group ID so files are owned by you (run `id` to check)
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     depends_on:
       - ollama
 
