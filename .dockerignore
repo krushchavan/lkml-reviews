@@ -1,0 +1,28 @@
+# Version control
+.git
+.gitignore
+
+# Python bytecode
+__pycache__
+*.pyc
+*.pyo
+
+# Generated output (mounted as volumes)
+reports/
+.llm_cache/
+
+# IDE and editor files
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Secrets
+AnthropicKey.txt
+.env
+
+# OS files
+Thumbs.db
+.DS_Store

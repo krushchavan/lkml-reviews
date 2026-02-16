@@ -1,0 +1,41 @@
+services:
+  lkml-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lkml-tracker
+    volumes:
+      - ./reports:/app/reports
+      - ./.llm_cache:/app/.llm_cache
+    environment:
+      # Required only for Anthropic backend (--llm-backend anthropic or --llm-all)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Ollama URL: point to your Ollama instance
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      # Cron mode: daily at 2:00 AM UTC, reports on previous day (the default)
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 2 * * *}
+      # CLI flags for generate_report.py in cron mode (default: Ollama LLM)
+      - REPORT_ARGS=${REPORT_ARGS:---llm}
+      # Run a report immediately on container start (cron mode only)
+      - RUN_ON_STARTUP=${RUN_ON_STARTUP:-false}
+    depends_on:
+      - ollama
+
+    # Cron mode (default): runs daily at 2:00 AM UTC for yesterday's activity with Ollama
+    #   docker compose up -d
+    #
+    # On-demand usage (override cron by unsetting schedule):
+    #   docker compose run --rm -e CRON_SCHEDULE= lkml-tracker --date 2025-02-12
+    #   docker compose run --rm -e CRON_SCHEDULE= lkml-tracker --date 2025-02-12 --llm
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lkml-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:
