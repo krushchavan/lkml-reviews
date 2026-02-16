@@ -44,9 +44,39 @@ run_cmd() {
     fi
 }
 
-# Generate a timestamped log filename: lkml_2025-02-15_023000.log
+# Extract the report date from CLI arguments.
+# Looks for --date YYYY-MM-DD; defaults to yesterday if not provided.
+get_report_date() {
+    local args="$*"
+    local date_val=""
+    # Parse --date from arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --date)
+                date_val="$2"
+                shift 2
+                ;;
+            --date=*)
+                date_val="${1#--date=}"
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$date_val" ]; then
+        echo "$date_val"
+    else
+        # Default: yesterday (same as generate_report.py)
+        date -d "yesterday" '+%Y-%m-%d' 2>/dev/null || date -v-1d '+%Y-%m-%d'
+    fi
+}
+
+# Generate log filename based on the report date: lkml_2025-02-15.log
 log_file() {
-    echo "${LOG_DIR}/lkml_$(date '+%Y-%m-%d_%H%M%S').log"
+    local report_date="$1"
+    echo "${LOG_DIR}/lkml_${report_date}.log"
 }
 
 if [ -n "$CRON_SCHEDULE" ]; then
@@ -78,9 +108,10 @@ if [ -n "$CRON_SCHEDULE" ]; then
     fi
 
     # Write crontab entry
-    # Logs to timestamped file AND docker logs (via tee to PID 1 stdout)
+    # Logs to file named after the report date AND docker logs (via tee to PID 1 stdout)
+    # Cron runs for yesterday's activity (generate_report.py default), so log uses yesterday's date
     # After report generation, rebuild the index page
-    CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && LOGFILE=${LOG_DIR}/lkml_\$(date '+\\%Y-\\%m-\\%d_\\%H\\%M\\%S').log && $REPORT_CMD 2>&1 | tee \"\$LOGFILE\" >> /proc/1/fd/1 && $INDEX_CMD >> /proc/1/fd/1 2>&1"
+    CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && REPORT_DATE=\$(date -d 'yesterday' '+\\%Y-\\%m-\\%d') && LOGFILE=${LOG_DIR}/lkml_\${REPORT_DATE}.log && $REPORT_CMD 2>&1 | tee \"\$LOGFILE\" >> /proc/1/fd/1 && $INDEX_CMD >> /proc/1/fd/1 2>&1"
     echo "$CRON_LINE" | crontab -
 
     echo "[entrypoint] Cron job installed. Waiting for schedule..."
@@ -89,8 +120,9 @@ if [ -n "$CRON_SCHEDULE" ]; then
 
     # Run an initial report immediately if requested
     if [ "$RUN_ON_STARTUP" = "true" ]; then
-        LOGFILE=$(log_file)
-        echo "[entrypoint] RUN_ON_STARTUP=true, running initial report..."
+        REPORT_DATE=$(get_report_date ${REPORT_ARGS:-})
+        LOGFILE=$(log_file "$REPORT_DATE")
+        echo "[entrypoint] RUN_ON_STARTUP=true, running initial report for $REPORT_DATE..."
         echo "[entrypoint] Log file: $LOGFILE"
         run_cmd "cd /app && python generate_report.py ${REPORT_ARGS:-}" 2>&1 | tee "$LOGFILE"
         echo "[entrypoint] Rebuilding index page..."
@@ -100,8 +132,9 @@ if [ -n "$CRON_SCHEDULE" ]; then
     # Start cron in foreground (cron itself must run as root)
     exec cron -f
 else
-    LOGFILE=$(log_file)
-    echo "[entrypoint] On-demand mode"
+    REPORT_DATE=$(get_report_date "$@")
+    LOGFILE=$(log_file "$REPORT_DATE")
+    echo "[entrypoint] On-demand mode (report date: $REPORT_DATE)"
     echo "[entrypoint] Log file: $LOGFILE"
     # Pass all arguments through to generate_report.py, log to file and stdout
     run_cmd "cd /app && python generate_report.py $*" 2>&1 | tee "$LOGFILE"

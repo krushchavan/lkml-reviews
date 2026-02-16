@@ -51,7 +51,11 @@ def _report_label(filename: str) -> str:
 
 def _log_label(filename: str) -> str:
     """Build a human-readable label for a log file."""
-    # lkml_2025-02-13_143000.log -> 14:30:00
+    # New format: lkml_2025-02-13.log -> "Log"
+    # Legacy format: lkml_2025-02-13_143000.log -> "14:30:00"
+    m = re.match(r"lkml_(\d{4}-\d{2}-\d{2})\.log$", filename)
+    if m:
+        return "Log"
     m = re.match(r"lkml_\d{4}-\d{2}-\d{2}_(\d{2})(\d{2})(\d{2})\.log", filename)
     if m:
         return f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
