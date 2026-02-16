@@ -71,9 +71,16 @@ if [ -n "$CRON_SCHEDULE" ]; then
     # Add PATH so python is found
     echo "PATH=$PATH" >> "$ENV_FILE"
 
+    # Build the index rebuild command
+    INDEX_CMD="cd /app && python build_index.py --reports-dir /app/reports --logs-dir /app/logs"
+    if [ -n "$RUN_AS" ]; then
+        INDEX_CMD="su -s /bin/bash $RUN_AS -c '$INDEX_CMD'"
+    fi
+
     # Write crontab entry
     # Logs to timestamped file AND docker logs (via tee to PID 1 stdout)
-    CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && LOGFILE=${LOG_DIR}/lkml_\$(date '+\\%Y-\\%m-\\%d_\\%H\\%M\\%S').log && $REPORT_CMD 2>&1 | tee \"\$LOGFILE\" >> /proc/1/fd/1"
+    # After report generation, rebuild the index page
+    CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && LOGFILE=${LOG_DIR}/lkml_\$(date '+\\%Y-\\%m-\\%d_\\%H\\%M\\%S').log && $REPORT_CMD 2>&1 | tee \"\$LOGFILE\" >> /proc/1/fd/1 && $INDEX_CMD >> /proc/1/fd/1 2>&1"
     echo "$CRON_LINE" | crontab -
 
     echo "[entrypoint] Cron job installed. Waiting for schedule..."
@@ -86,6 +93,8 @@ if [ -n "$CRON_SCHEDULE" ]; then
         echo "[entrypoint] RUN_ON_STARTUP=true, running initial report..."
         echo "[entrypoint] Log file: $LOGFILE"
         run_cmd "cd /app && python generate_report.py ${REPORT_ARGS:-}" 2>&1 | tee "$LOGFILE"
+        echo "[entrypoint] Rebuilding index page..."
+        run_cmd "cd /app && python build_index.py --reports-dir /app/reports --logs-dir /app/logs"
     fi
 
     # Start cron in foreground (cron itself must run as root)
@@ -96,4 +105,7 @@ else
     echo "[entrypoint] Log file: $LOGFILE"
     # Pass all arguments through to generate_report.py, log to file and stdout
     run_cmd "cd /app && python generate_report.py $*" 2>&1 | tee "$LOGFILE"
+    # Rebuild the index page
+    echo "[entrypoint] Rebuilding index page..."
+    run_cmd "cd /app && python build_index.py --reports-dir /app/reports --logs-dir /app/logs"
 fi
