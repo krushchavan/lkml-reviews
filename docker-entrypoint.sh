@@ -10,7 +10,16 @@ set -e
 # the correct ownership (e.g., PUID=1000 PGID=1000).
 
 LOG_DIR="/app/logs"
-mkdir -p "$LOG_DIR"
+
+# --- Fix volume permissions first (as root, before anything else) ---
+# On Linux, bind-mounted dirs may be owned by root with restricted permissions.
+# Ensure they exist and are accessible.
+for dir in /app/reports /app/.llm_cache "$LOG_DIR"; do
+    mkdir -p "$dir"
+    chmod 777 "$dir" 2>/dev/null || true
+    # Also fix any existing files inside
+    find "$dir" -maxdepth 1 -type f -exec chmod 666 {} \; 2>/dev/null || true
+done
 
 # --- Set up non-root user if PUID/PGID are provided ---
 RUN_AS=""
@@ -18,17 +27,13 @@ if [ -n "$PUID" ]; then
     PGID=${PGID:-$PUID}
     # Create group/user if they don't already exist
     getent group "$PGID" >/dev/null 2>&1 || groupadd -g "$PGID" appgroup
-    GROUP_NAME=$(getent group "$PGID" | cut -d: -f1)
     id -u "$PUID" >/dev/null 2>&1 || useradd -u "$PUID" -g "$PGID" -M -s /bin/bash appuser
     USER_NAME=$(id -nu "$PUID")
     # Own the writable directories
-    chown -R "$PUID:$PGID" /app/reports /app/.llm_cache /app/logs
+    chown -R "$PUID:$PGID" /app/reports /app/.llm_cache "$LOG_DIR" 2>/dev/null || true
     RUN_AS="$USER_NAME"
     echo "[entrypoint] Running as $USER_NAME (uid=$PUID gid=$PGID)"
 fi
-
-# Ensure mounted volumes are writable
-chmod -R a+rw /app/reports /app/.llm_cache /app/logs 2>/dev/null || true
 
 # Helper: run a command as the app user (or root if PUID not set)
 run_cmd() {

@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: lkml-tracker
     volumes:
-      - ./reports:/app/reports
-      - ./.llm_cache:/app/.llm_cache
-      - ./logs:/app/logs
+      - ./reports:/app/reports:z
+      - ./.llm_cache:/app/.llm_cache:z
+      - ./logs:/app/logs:z
     environment:
       # Required only for Anthropic backend (--llm-backend anthropic or --llm-all)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
