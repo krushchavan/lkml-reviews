@@ -3,6 +3,8 @@
 Usage:
     python generate_report.py                              # Yesterday's report
     python generate_report.py --date 2025-02-12            # Specific date
+    python generate_report.py --days 7                     # Last 7 days
+    python generate_report.py --date 2025-02-15 --days 7   # Feb 9-15 (7 days ending Feb 15)
     python generate_report.py --people custom.csv -v       # Custom CSV, verbose
     python generate_report.py --skip-threads               # Fast mode, no summaries
 
@@ -19,6 +21,7 @@ Multi-LLM comparison (both Ollama and Anthropic):
 
 import argparse
 import csv
+import json
 import logging
 import os
 import re
@@ -43,7 +46,7 @@ from llm_summarizer import (
     analyze_thread_llm,
 )
 from models import ActivityItem, ActivityType, DailyReport, Developer, DeveloperReport, LLMAnalysis
-from report_generator import generate_html_report
+from report_generator import extract_reviews_data, generate_html_report, message_id_to_slug
 from thread_analyzer import analyze_thread
 
 logger = logging.getLogger(__name__)
@@ -58,6 +61,16 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Date to report on (YYYY-MM-DD format). Defaults to yesterday.",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=1,
+        help=(
+            "Number of days to generate reports for (default: 1). "
+            "Reports are generated for each day ending on --date (or yesterday). "
+            "E.g., --date 2026-02-15 --days 7 generates reports from Feb 9–15."
+        ),
     )
     parser.add_argument(
         "--people",
@@ -393,6 +406,132 @@ def process_developer(
     return report
 
 
+def generate_single_report(
+    args: argparse.Namespace,
+    target_date: datetime,
+    developers: list[Developer],
+    client: LKMLClient,
+    llm_backends: dict[str, "LLMBackend"],
+) -> Path:
+    """Generate a report for a single date. Returns the output file path."""
+    date_display = target_date.strftime("%Y-%m-%d")
+    date_lore = target_date.strftime("%Y%m%d")
+
+    logger.info("Generating report for %s", date_display)
+
+    # Initialize LLM cache per-date
+    llm_cache: Optional[LLMCache] = None
+    if llm_backends and not args.llm_no_cache:
+        llm_cache = LLMCache(date_str=date_display)
+        logger.info(
+            "LLM cache: enabled (%d cached entries)",
+            llm_cache.stats()["entries"],
+        )
+
+    # Process each developer
+    start_time = time.time()
+    daily_report = DailyReport(date=date_display)
+
+    # Record LLM info for the report filename and HTML header
+    for backend_name, backend in llm_backends.items():
+        daily_report.llm_backends.append((backend_name, backend.model))
+
+    for i, dev in enumerate(developers, 1):
+        logger.info("[%d/%d] Processing %s...", i, len(developers), dev.name)
+        try:
+            dev_report = process_developer(
+                client, dev, date_lore, args.skip_threads,
+                llm_backends=llm_backends if llm_backends else None,
+                llm_cache=llm_cache,
+            )
+        except Exception as e:
+            logger.error("Unexpected error processing %s: %s", dev.name, e)
+            dev_report = DeveloperReport(
+                developer=dev, errors=[f"Unexpected error: {e}"]
+            )
+
+        daily_report.developer_reports.append(dev_report)
+        daily_report.total_patches += len(dev_report.patches_submitted)
+        daily_report.total_reviews += len(dev_report.patches_reviewed)
+        daily_report.total_acks += len(dev_report.patches_acked)
+
+    daily_report.generation_time_seconds = time.time() - start_time
+
+    # Write output — include LLM backend/model in filename when enabled
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if daily_report.llm_backends:
+        # Build filename with all backends, e.g. "2025-02-11_ollama_llama3.1-8b_anthropic_claude-haiku-4-5.html"
+        parts = [date_display]
+        for backend_name, model_name in daily_report.llm_backends:
+            safe_model = model_name.replace(":", "-").replace("/", "-")
+            parts.append(f"{backend_name}_{safe_model}")
+        output_path = output_dir / f"{'_'.join(parts)}.html"
+    else:
+        output_path = output_dir / f"{date_display}.html"
+
+    # --- Save per-patchset review JSON and build review_links ---
+    reviews_dir = output_dir / "reviews"
+    reviews_dir.mkdir(parents=True, exist_ok=True)
+
+    reviews_data = extract_reviews_data(daily_report, output_path.name)
+    review_links: dict[str, str] = {}  # message_id -> slug
+
+    for item_data in reviews_data:
+        slug = item_data["slug"]
+        msg_id = item_data["message_id"]
+        review_links[msg_id] = slug
+
+        json_path = reviews_dir / f"{slug}.json"
+
+        # Merge with existing JSON (accumulate across dates)
+        if json_path.exists():
+            try:
+                existing = json.loads(json_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                existing = {}
+        else:
+            existing = {}
+
+        # Preserve existing dates, update/add current date
+        dates = existing.get("dates", {})
+        dates[item_data["date"]] = {
+            "report_file": item_data["report_file"],
+            "developer": item_data["developer"],
+            "reviews": item_data["reviews"],
+        }
+
+        merged = {
+            "thread_id": msg_id,
+            "subject": item_data["subject"],
+            "url": item_data["url"],
+            "dates": dates,
+        }
+        json_path.write_text(
+            json.dumps(merged, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    if reviews_data:
+        logger.info("Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir)
+
+    # Generate HTML report with review links (compact summaries + links to detail pages)
+    html_content = generate_html_report(daily_report, review_links=review_links if review_links else None)
+    output_path.write_text(html_content, encoding="utf-8")
+
+    logger.info(
+        "Report generated: %s (%d patches, %d reviews, %d acks in %.1fs)",
+        output_path,
+        daily_report.total_patches,
+        daily_report.total_reviews,
+        daily_report.total_acks,
+        daily_report.generation_time_seconds,
+    )
+    print(f"\nReport: {output_path.resolve()}")
+    return output_path
+
+
 def main():
     args = parse_args()
 
@@ -402,20 +541,34 @@ def main():
         datefmt="%H:%M:%S",
     )
 
-    # Determine target date
+    # Determine target end date
     if args.date:
         try:
-            target_date = datetime.strptime(args.date, "%Y-%m-%d")
+            end_date = datetime.strptime(args.date, "%Y-%m-%d")
         except ValueError:
             logger.error("Invalid date format: %s (expected YYYY-MM-DD)", args.date)
             sys.exit(1)
     else:
-        target_date = datetime.now() - timedelta(days=1)
+        end_date = datetime.now() - timedelta(days=1)
 
-    date_display = target_date.strftime("%Y-%m-%d")
-    date_lore = target_date.strftime("%Y%m%d")
+    # Validate --days
+    num_days = args.days
+    if num_days < 1:
+        logger.error("--days must be at least 1 (got %d)", num_days)
+        sys.exit(1)
 
-    logger.info("Generating report for %s", date_display)
+    # Build the list of dates (oldest first)
+    target_dates = [
+        end_date - timedelta(days=i) for i in range(num_days - 1, -1, -1)
+    ]
+
+    if num_days > 1:
+        logger.info(
+            "Generating reports for %d days: %s to %s",
+            num_days,
+            target_dates[0].strftime("%Y-%m-%d"),
+            target_dates[-1].strftime("%Y-%m-%d"),
+        )
 
     # Load developers
     developers = load_developers(args.people)
@@ -428,7 +581,6 @@ def main():
 
     # Initialize LLM backends (if requested)
     llm_backends: dict[str, LLMBackend] = {}
-    llm_cache: Optional[LLMCache] = None
 
     if args.llm_all:
         # --llm-all: initialize BOTH Ollama and Anthropic
@@ -487,69 +639,22 @@ def main():
             logger.error("Failed to initialize LLM backend: %s", e)
             logger.info("Falling back to heuristic analysis.")
 
-    if llm_backends and not args.llm_no_cache:
-        llm_cache = LLMCache(date_str=date_display)
+    # Generate a report for each date
+    total_start = time.time()
+    for day_num, target_date in enumerate(target_dates, 1):
+        if num_days > 1:
+            logger.info(
+                "=== Day %d/%d: %s ===",
+                day_num, num_days, target_date.strftime("%Y-%m-%d"),
+            )
+        generate_single_report(args, target_date, developers, client, llm_backends)
+
+    if num_days > 1:
+        total_elapsed = time.time() - total_start
         logger.info(
-            "LLM cache: enabled (%d cached entries)",
-            llm_cache.stats()["entries"],
+            "All %d reports generated in %.1fs",
+            num_days, total_elapsed,
         )
-
-    # Process each developer
-    start_time = time.time()
-    daily_report = DailyReport(date=date_display)
-
-    # Record LLM info for the report filename and HTML header
-    for backend_name, backend in llm_backends.items():
-        daily_report.llm_backends.append((backend_name, backend.model))
-
-    for i, dev in enumerate(developers, 1):
-        logger.info("[%d/%d] Processing %s...", i, len(developers), dev.name)
-        try:
-            dev_report = process_developer(
-                client, dev, date_lore, args.skip_threads,
-                llm_backends=llm_backends if llm_backends else None,
-                llm_cache=llm_cache,
-            )
-        except Exception as e:
-            logger.error("Unexpected error processing %s: %s", dev.name, e)
-            dev_report = DeveloperReport(
-                developer=dev, errors=[f"Unexpected error: {e}"]
-            )
-
-        daily_report.developer_reports.append(dev_report)
-        daily_report.total_patches += len(dev_report.patches_submitted)
-        daily_report.total_reviews += len(dev_report.patches_reviewed)
-        daily_report.total_acks += len(dev_report.patches_acked)
-
-    daily_report.generation_time_seconds = time.time() - start_time
-
-    # Generate HTML
-    html_content = generate_html_report(daily_report)
-
-    # Write output — include LLM backend/model in filename when enabled
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    if daily_report.llm_backends:
-        # Build filename with all backends, e.g. "2025-02-11_ollama_llama3.1-8b_anthropic_claude-haiku-4-5.html"
-        parts = [date_display]
-        for backend_name, model_name in daily_report.llm_backends:
-            safe_model = model_name.replace(":", "-").replace("/", "-")
-            parts.append(f"{backend_name}_{safe_model}")
-        output_path = output_dir / f"{'_'.join(parts)}.html"
-    else:
-        output_path = output_dir / f"{date_display}.html"
-    output_path.write_text(html_content, encoding="utf-8")
-
-    logger.info(
-        "Report generated: %s (%d patches, %d reviews, %d acks in %.1fs)",
-        output_path,
-        daily_report.total_patches,
-        daily_report.total_reviews,
-        daily_report.total_acks,
-        daily_report.generation_time_seconds,
-    )
-    print(f"\nReport: {output_path.resolve()}")
 
 
 if __name__ == "__main__":

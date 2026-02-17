@@ -51,11 +51,15 @@ def _report_label(filename: str) -> str:
 
 def _log_label(filename: str) -> str:
     """Build a human-readable label for a log file."""
-    # New format: lkml_2025-02-13.log -> "Log"
-    # Legacy format: lkml_2025-02-13_143000.log -> "14:30:00"
+    # Single-day: lkml_2025-02-13.log -> "Log"
     m = re.match(r"lkml_(\d{4}-\d{2}-\d{2})\.log$", filename)
     if m:
         return "Log"
+    # Range: lkml_2025-02-13_to_2025-02-15.log -> "Log (Feb 13–15)"
+    m = re.match(r"lkml_(\d{4}-\d{2}-\d{2})_to_(\d{4}-\d{2}-\d{2})\.log$", filename)
+    if m:
+        return "Log"
+    # Legacy format: lkml_2025-02-13_143000.log -> "14:30:00"
     m = re.match(r"lkml_\d{4}-\d{2}-\d{2}_(\d{2})(\d{2})(\d{2})\.log", filename)
     if m:
         return f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
@@ -64,14 +68,22 @@ def _log_label(filename: str) -> str:
 
 def build_index(reports_dir: Path, logs_dir: Path) -> str:
     """Generate index.html content."""
-    # Collect reports
+    # Collect reports (exclude index.html, reviews/ subdir entries)
     reports_by_date: dict[str, list[str]] = defaultdict(list)
     if reports_dir.exists():
         for f in sorted(reports_dir.iterdir()):
-            if f.suffix == ".html" and f.name != "index.html":
-                date = _extract_date(f.name)
-                if date:
-                    reports_by_date[date].append(f.name)
+            if not f.is_file() or f.suffix != ".html":
+                continue
+            if f.name == "index.html":
+                continue
+            date = _extract_date(f.name)
+            if date:
+                reports_by_date[date].append(f.name)
+
+    # Check if reviews/ subdir exists for the "Review Comments" link
+    has_reviews = (reports_dir / "reviews").exists() and any(
+        (reports_dir / "reviews").glob("*.html")
+    )
 
     # Collect logs
     logs_by_date: dict[str, list[str]] = defaultdict(list)
@@ -242,6 +254,23 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             font-size: 0.82em;
             font-style: italic;
         }}
+        .reviews-link {{
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 0.9em;
+        }}
+        .reviews-link a {{
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .reviews-link a:hover {{
+            text-decoration: underline;
+        }}
         footer {{
             text-align: center;
             color: #aaa;
@@ -269,6 +298,8 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             <div class="stat-label">Log Files</div>
         </div>
     </div>
+
+    {'<div class="reviews-link"><a href="reviews/">Browse Review Comments &rarr;</a></div>' if has_reviews else ''}
 
     <table>
         <thead>

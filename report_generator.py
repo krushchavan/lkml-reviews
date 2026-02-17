@@ -1,7 +1,9 @@
 """HTML report generator for LKML daily activity reports."""
 
 import html
+import re
 from datetime import datetime
+from typing import Optional
 
 from models import (
     ActivityItem,
@@ -13,6 +15,21 @@ from models import (
     ReviewComment,
     Sentiment,
 )
+
+
+def message_id_to_slug(message_id: str) -> str:
+    """Convert a message-id to a filesystem-safe slug.
+
+    Example: '<20250213.abc@kernel.org>' -> '20250213-abc-kernel-org'
+    """
+    # Strip angle brackets
+    slug = message_id.strip("<>")
+    # Replace non-alphanumeric with hyphens
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", slug)
+    # Collapse multiple hyphens, strip leading/trailing
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    # Limit length to avoid overly long filenames
+    return slug[:120]
 
 _SENTIMENT_COLORS = {
     Sentiment.POSITIVE: ("#155724", "#d4edda"),
@@ -97,10 +114,48 @@ def _render_review_comment(rc: ReviewComment) -> str:
     return "\n".join(parts)
 
 
-def _render_conversation_body(conv: ConversationSummary) -> str:
+def _render_compact_reviews(conv: ConversationSummary, review_link: str) -> str:
+    """Render a compact review summary line with a link to the detail page."""
+    parts: list[str] = []
+    parts.append('<div class="review-comments-compact">')
+
+    # Participant count
+    reviewer_descs = []
+    for rc in conv.review_comments:
+        desc = _esc(rc.author)
+        annotations = []
+        if rc.tags_given:
+            annotations.extend(rc.tags_given)
+        if rc.has_inline_review:
+            annotations.append("Inline Review")
+        if annotations:
+            desc += f' ({", ".join(_esc(a) for a in annotations)})'
+        reviewer_descs.append(desc)
+
+    parts.append(f'<span class="review-comments-header">'
+                 f'{conv.participant_count} participants</span>')
+    if reviewer_descs:
+        parts.append(f'<span class="reviewer-list"> &mdash; '
+                     f'{", ".join(reviewer_descs)}</span>')
+
+    parts.append(f'<div class="review-detail-link">'
+                 f'<a href="{_esc(review_link)}">View review comments &rarr;</a>'
+                 f'</div>')
+    parts.append("</div>")
+    return "\n".join(parts)
+
+
+def _render_conversation_body(
+    conv: ConversationSummary, review_link: Optional[str] = None
+) -> str:
     """Render the body of a conversation summary (sentiment, progress, patch summary, reviews).
 
     Shared between single-analysis and multi-analysis card rendering.
+
+    Args:
+        conv: The conversation summary data.
+        review_link: If provided, render compact review summary with link to detail page
+                     instead of inline review comments.
     """
     parts: list[str] = []
 
@@ -128,8 +183,10 @@ def _render_conversation_body(conv: ConversationSummary) -> str:
             f'</div>'
         )
 
-    # Individual review comments (preferred) or fallback to key points
-    if conv.review_comments:
+    # Individual review comments: compact with link, or inline (fallback)
+    if conv.review_comments and review_link:
+        parts.append(_render_compact_reviews(conv, review_link))
+    elif conv.review_comments:
         parts.append('<div class="review-comments">')
         parts.append(f'<div class="review-comments-header">'
                      f'{conv.participant_count} participants</div>')
@@ -151,17 +208,35 @@ def _render_conversation_body(conv: ConversationSummary) -> str:
     return "\n".join(parts)
 
 
-def _render_llm_analysis_card(analysis: LLMAnalysis) -> str:
+def _render_llm_analysis_card(
+    analysis: LLMAnalysis, review_link: Optional[str] = None
+) -> str:
     """Render a single LLM analysis as an attributed card."""
     parts: list[str] = []
     parts.append('<div class="llm-analysis">')
     parts.append(f'<div class="llm-analysis-header">{_esc(analysis.label)}</div>')
-    parts.append(_render_conversation_body(analysis.conversation))
+    parts.append(_render_conversation_body(analysis.conversation, review_link=review_link))
     parts.append("</div>")
     return "\n".join(parts)
 
 
-def _render_activity_item(item: ActivityItem, section_type: str) -> str:
+def _get_review_link(
+    item: ActivityItem, review_links: Optional[dict[str, str]], report_date: str
+) -> Optional[str]:
+    """Look up the review detail page link for an activity item."""
+    if not review_links:
+        return None
+    msg_id = item.message_id
+    slug = review_links.get(msg_id)
+    if slug:
+        return f"reviews/{slug}.html#{report_date}"
+    return None
+
+
+def _render_activity_item(
+    item: ActivityItem, section_type: str,
+    review_links: Optional[dict[str, str]] = None, report_date: str = ""
+) -> str:
     parts = []
     css_class = "activity-item ongoing" if item.is_ongoing else "activity-item"
     parts.append(f'<div class="{css_class}">')
@@ -186,22 +261,26 @@ def _render_activity_item(item: ActivityItem, section_type: str) -> str:
     if item.series_patch_count and item.series_patch_count > 1:
         parts.append(f'<span class="patch-count">{item.series_patch_count} patches</span>')
 
+    review_link = _get_review_link(item, review_links, report_date)
+
     # Multi-LLM analyses (when --llm-all produces multiple results)
     if len(item.llm_analyses) > 1:
         parts.append('<div class="llm-analyses">')
         for analysis in item.llm_analyses:
-            parts.append(_render_llm_analysis_card(analysis))
+            parts.append(_render_llm_analysis_card(analysis, review_link=review_link))
         parts.append("</div>")
     elif item.conversation:
         # Single analysis (single backend or heuristic)
-        parts.append(_render_conversation_body(item.conversation))
+        parts.append(_render_conversation_body(item.conversation, review_link=review_link))
 
     parts.append("</div>")
     return "\n".join(parts)
 
 
 def _render_activity_section(
-    items: list[ActivityItem], title: str, section_type: str, open_by_default: bool = False
+    items: list[ActivityItem], title: str, section_type: str,
+    open_by_default: bool = False,
+    review_links: Optional[dict[str, str]] = None, report_date: str = ""
 ) -> str:
     count = len(items)
     open_attr = " open" if open_by_default and count > 0 else ""
@@ -214,13 +293,18 @@ def _render_activity_section(
         parts.append('<div class="no-activity">No activity</div>')
     else:
         for item in items:
-            parts.append(_render_activity_item(item, section_type))
+            parts.append(_render_activity_item(
+                item, section_type, review_links=review_links, report_date=report_date
+            ))
 
     parts.append("</details>")
     return "\n".join(parts)
 
 
-def _render_developer_section(dev_report: DeveloperReport) -> str:
+def _render_developer_section(
+    dev_report: DeveloperReport,
+    review_links: Optional[dict[str, str]] = None, report_date: str = ""
+) -> str:
     total = (
         len(dev_report.patches_submitted)
         + len(dev_report.patches_reviewed)
@@ -245,13 +329,16 @@ def _render_developer_section(dev_report: DeveloperReport) -> str:
         parts.append("</div>")
 
     parts.append(_render_activity_section(
-        dev_report.patches_submitted, "Patches Submitted", "patch", open_by_default=True
+        dev_report.patches_submitted, "Patches Submitted", "patch",
+        open_by_default=True, review_links=review_links, report_date=report_date
     ))
     parts.append(_render_activity_section(
-        dev_report.patches_reviewed, "Reviews Given", "review"
+        dev_report.patches_reviewed, "Reviews Given", "review",
+        review_links=review_links, report_date=report_date
     ))
     parts.append(_render_activity_section(
-        dev_report.patches_acked, "Acks / Tags Given", "ack"
+        dev_report.patches_acked, "Acks / Tags Given", "ack",
+        review_links=review_links, report_date=report_date
     ))
 
     parts.append("</div>")
@@ -333,16 +420,72 @@ def _render_statistics(report: DailyReport) -> str:
     """
 
 
-def generate_html_report(daily_report: DailyReport) -> str:
+def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> list[dict]:
+    """Extract review comment data from a DailyReport for JSON serialization.
+
+    Returns a list of dicts, one per activity item that has review comments:
+    [
+        {
+            "message_id": "<msg-id>",
+            "slug": "sanitized-slug",
+            "subject": "patch subject line",
+            "url": "https://lore.kernel.org/...",
+            "developer": "Developer Name",
+            "date": "2026-02-15",
+            "report_file": "2026-02-15_ollama_llama3.1-8b.html",
+            "reviews": [ { "author", "summary", "sentiment", ... } ]
+        }
+    ]
+    """
+    results = []
+    for dr in daily_report.developer_reports:
+        all_items = (
+            dr.patches_submitted + dr.patches_reviewed + dr.patches_acked
+        )
+        for item in all_items:
+            conv = item.conversation
+            if not conv or not conv.review_comments:
+                continue
+            reviews = []
+            for rc in conv.review_comments:
+                reviews.append({
+                    "author": rc.author,
+                    "summary": rc.summary,
+                    "sentiment": rc.sentiment.value,
+                    "sentiment_signals": rc.sentiment_signals,
+                    "has_inline_review": rc.has_inline_review,
+                    "tags_given": rc.tags_given,
+                })
+            results.append({
+                "message_id": item.message_id,
+                "slug": message_id_to_slug(item.message_id),
+                "subject": item.subject,
+                "url": item.url,
+                "developer": dr.developer.name,
+                "date": daily_report.date,
+                "report_file": report_filename,
+                "reviews": reviews,
+            })
+    return results
+
+
+def generate_html_report(
+    daily_report: DailyReport,
+    review_links: Optional[dict[str, str]] = None,
+) -> str:
     """Generate a complete self-contained HTML report.
 
     Args:
         daily_report: The DailyReport data structure.
+        review_links: Optional mapping of message_id -> slug for review detail pages.
+                      When provided, review comments are rendered as compact summaries
+                      with links to per-patchset detail pages.
 
     Returns:
         Complete HTML string ready to write to file.
     """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    report_date = daily_report.date
 
     # Build LLM info string for display in the report
     if daily_report.llm_backends:
@@ -353,7 +496,8 @@ def generate_html_report(daily_report: DailyReport) -> str:
         llm_label = ""
 
     developer_sections = "\n".join(
-        _render_developer_section(dr) for dr in daily_report.developer_reports
+        _render_developer_section(dr, review_links=review_links, report_date=report_date)
+        for dr in daily_report.developer_reports
     )
 
     stats_section = _render_statistics(daily_report)
@@ -662,6 +806,27 @@ def generate_html_report(daily_report: DailyReport) -> str:
             font-size: 0.9em;
             color: #999;
             font-style: italic;
+        }}
+        .review-comments-compact {{
+            margin-top: 8px;
+            border-left: 3px solid #ddd;
+            padding: 6px 12px;
+            font-size: 0.82em;
+            color: #666;
+        }}
+        .reviewer-list {{
+            color: #555;
+        }}
+        .review-detail-link {{
+            margin-top: 4px;
+        }}
+        .review-detail-link a {{
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .review-detail-link a:hover {{
+            text-decoration: underline;
         }}
         .activity-item.ongoing {{
             border-left: 3px solid #6f42c1;
