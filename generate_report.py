@@ -85,6 +85,12 @@ def parse_args() -> argparse.Namespace:
         help="Directory for HTML output files. Default: reports/",
     )
     parser.add_argument(
+        "--logs-dir",
+        type=str,
+        default="logs",
+        help="Directory for per-report log files. Default: logs/",
+    )
+    parser.add_argument(
         "--rate-limit",
         type=float,
         default=1.0,
@@ -146,6 +152,25 @@ def parse_args() -> argparse.Namespace:
         "--llm-no-cache",
         action="store_true",
         help="Disable disk caching of LLM results.",
+    )
+
+    # Purge options
+    purge_group = parser.add_argument_group("Purge / retention")
+    purge_group.add_argument(
+        "--retention-days",
+        type=int,
+        default=30,
+        help="Delete reports, logs, and review data older than this many days. Default: 30.",
+    )
+    purge_group.add_argument(
+        "--no-purge",
+        action="store_true",
+        help="Skip automatic purge after report generation.",
+    )
+    purge_group.add_argument(
+        "--purge-only",
+        action="store_true",
+        help="Only run the purge (no report generation).",
     )
 
     return parser.parse_args()
@@ -417,119 +442,296 @@ def generate_single_report(
     date_display = target_date.strftime("%Y-%m-%d")
     date_lore = target_date.strftime("%Y%m%d")
 
-    logger.info("Generating report for %s", date_display)
-
-    # Initialize LLM cache per-date
-    llm_cache: Optional[LLMCache] = None
-    if llm_backends and not args.llm_no_cache:
-        llm_cache = LLMCache(date_str=date_display)
-        logger.info(
-            "LLM cache: enabled (%d cached entries)",
-            llm_cache.stats()["entries"],
-        )
-
-    # Process each developer
-    start_time = time.time()
-    daily_report = DailyReport(date=date_display)
-
-    # Record LLM info for the report filename and HTML header
-    for backend_name, backend in llm_backends.items():
-        daily_report.llm_backends.append((backend_name, backend.model))
-
-    for i, dev in enumerate(developers, 1):
-        logger.info("[%d/%d] Processing %s...", i, len(developers), dev.name)
-        try:
-            dev_report = process_developer(
-                client, dev, date_lore, args.skip_threads,
-                llm_backends=llm_backends if llm_backends else None,
-                llm_cache=llm_cache,
-            )
-        except Exception as e:
-            logger.error("Unexpected error processing %s: %s", dev.name, e)
-            dev_report = DeveloperReport(
-                developer=dev, errors=[f"Unexpected error: {e}"]
-            )
-
-        daily_report.developer_reports.append(dev_report)
-        daily_report.total_patches += len(dev_report.patches_submitted)
-        daily_report.total_reviews += len(dev_report.patches_reviewed)
-        daily_report.total_acks += len(dev_report.patches_acked)
-
-    daily_report.generation_time_seconds = time.time() - start_time
-
-    # Write output — include LLM backend/model in filename when enabled
+    # --- Compute output filename early (needed for log filename) ---
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if daily_report.llm_backends:
-        # Build filename with all backends, e.g. "2025-02-11_ollama_llama3.1-8b_anthropic_claude-haiku-4-5.html"
+    if llm_backends:
         parts = [date_display]
-        for backend_name, model_name in daily_report.llm_backends:
-            safe_model = model_name.replace(":", "-").replace("/", "-")
+        for backend_name, backend in llm_backends.items():
+            safe_model = backend.model.replace(":", "-").replace("/", "-")
             parts.append(f"{backend_name}_{safe_model}")
         output_path = output_dir / f"{'_'.join(parts)}.html"
     else:
         output_path = output_dir / f"{date_display}.html"
 
-    # --- Save per-patchset review JSON and build review_links ---
-    reviews_dir = output_dir / "reviews"
-    reviews_dir.mkdir(parents=True, exist_ok=True)
+    # --- Set up per-report log file ---
+    logs_dir = Path(args.logs_dir)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_path = logs_dir / f"{output_path.stem}.log"
 
-    reviews_data = extract_reviews_data(daily_report, output_path.name)
-    review_links: dict[str, str] = {}  # message_id -> slug
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+    )
+    file_handler.setLevel(logging.DEBUG)
+    root_logger = logging.getLogger()
+    root_logger.addHandler(file_handler)
 
-    for item_data in reviews_data:
-        slug = item_data["slug"]
-        msg_id = item_data["message_id"]
-        review_links[msg_id] = slug
+    status = "success"
+    error_msg = ""
+    start_time = time.time()
+    daily_report = DailyReport(date=date_display)
 
-        json_path = reviews_dir / f"{slug}.json"
+    try:
+        logger.info("Generating report for %s", date_display)
+        logger.info("Log file: %s", log_path)
 
-        # Merge with existing JSON (accumulate across dates)
-        if json_path.exists():
+        # Initialize LLM cache per-date
+        llm_cache: Optional[LLMCache] = None
+        if llm_backends and not args.llm_no_cache:
+            llm_cache = LLMCache(date_str=date_display)
+            logger.info(
+                "LLM cache: enabled (%d cached entries)",
+                llm_cache.stats()["entries"],
+            )
+
+        # Record LLM info for the HTML header
+        for backend_name, backend in llm_backends.items():
+            daily_report.llm_backends.append((backend_name, backend.model))
+
+        for i, dev in enumerate(developers, 1):
+            logger.info("[%d/%d] Processing %s...", i, len(developers), dev.name)
             try:
-                existing = json.loads(json_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+                dev_report = process_developer(
+                    client, dev, date_lore, args.skip_threads,
+                    llm_backends=llm_backends if llm_backends else None,
+                    llm_cache=llm_cache,
+                )
+            except Exception as e:
+                logger.error("Unexpected error processing %s: %s", dev.name, e)
+                dev_report = DeveloperReport(
+                    developer=dev, errors=[f"Unexpected error: {e}"]
+                )
+
+            daily_report.developer_reports.append(dev_report)
+            daily_report.total_patches += len(dev_report.patches_submitted)
+            daily_report.total_reviews += len(dev_report.patches_reviewed)
+            daily_report.total_acks += len(dev_report.patches_acked)
+
+        daily_report.generation_time_seconds = time.time() - start_time
+
+        # --- Save per-patchset review JSON and build review_links ---
+        reviews_dir = output_dir / "reviews"
+        reviews_dir.mkdir(parents=True, exist_ok=True)
+
+        reviews_data = extract_reviews_data(daily_report, output_path.name)
+        review_links: dict[str, str] = {}  # message_id -> slug
+
+        for item_data in reviews_data:
+            slug = item_data["slug"]
+            msg_id = item_data["message_id"]
+            review_links[msg_id] = slug
+
+            json_path = reviews_dir / f"{slug}.json"
+
+            # Merge with existing JSON (accumulate across dates)
+            if json_path.exists():
+                try:
+                    existing = json.loads(json_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    existing = {}
+            else:
                 existing = {}
-        else:
-            existing = {}
 
-        # Preserve existing dates, update/add current date
-        dates = existing.get("dates", {})
-        dates[item_data["date"]] = {
-            "report_file": item_data["report_file"],
-            "developer": item_data["developer"],
-            "reviews": item_data["reviews"],
-        }
+            # Preserve existing dates, update/add current date
+            dates = existing.get("dates", {})
+            dates[item_data["date"]] = {
+                "report_file": item_data["report_file"],
+                "developer": item_data["developer"],
+                "reviews": item_data["reviews"],
+            }
 
-        merged = {
-            "thread_id": msg_id,
-            "subject": item_data["subject"],
-            "url": item_data["url"],
-            "dates": dates,
-        }
-        json_path.write_text(
-            json.dumps(merged, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+            merged = {
+                "thread_id": msg_id,
+                "subject": item_data["subject"],
+                "url": item_data["url"],
+                "dates": dates,
+            }
+            json_path.write_text(
+                json.dumps(merged, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+        if reviews_data:
+            logger.info("Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir)
+
+        # Generate HTML report with review links and log filename
+        html_content = generate_html_report(
+            daily_report,
+            review_links=review_links if review_links else None,
+            log_filename=log_path.name,
+        )
+        output_path.write_text(html_content, encoding="utf-8")
+
+        logger.info(
+            "Report generated: %s (%d patches, %d reviews, %d acks in %.1fs)",
+            output_path,
+            daily_report.total_patches,
+            daily_report.total_reviews,
+            daily_report.total_acks,
+            daily_report.generation_time_seconds,
         )
 
-    if reviews_data:
-        logger.info("Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir)
+    except Exception as exc:
+        status = "failed"
+        error_msg = str(exc)
+        logger.error("Report generation failed: %s", exc)
+        raise
 
-    # Generate HTML report with review links (compact summaries + links to detail pages)
-    html_content = generate_html_report(daily_report, review_links=review_links if review_links else None)
-    output_path.write_text(html_content, encoding="utf-8")
+    finally:
+        file_handler.close()
+        root_logger.removeHandler(file_handler)
+
+        # Record run in history log
+        elapsed = time.time() - start_time
+        _record_run(logs_dir, {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "report_date": date_display,
+            "report_file": output_path.name,
+            "log_file": log_path.name,
+            "status": status,
+            "error": error_msg,
+            "duration_seconds": round(elapsed, 1),
+            "patches": daily_report.total_patches,
+            "reviews": daily_report.total_reviews,
+            "acks": daily_report.total_acks,
+        })
+
+    return output_path
+
+
+def purge_old_files(
+    reports_dir: Path,
+    logs_dir: Path,
+    retention_days: int = 30,
+) -> dict[str, int]:
+    """Remove reports, logs, and review data older than retention_days.
+
+    Deletes:
+      - reports/*.html whose date prefix is older than the cutoff
+      - logs/*.log whose date prefix is older than the cutoff
+      - review JSON/HTML entries: removes date entries from JSON files for dates
+        older than the cutoff, and deletes the JSON+HTML pair if no dates remain
+
+    Returns a dict with counts: {"reports", "logs", "reviews"}.
+    """
+    cutoff = (datetime.now() - timedelta(days=retention_days)).strftime("%Y-%m-%d")
+    counts = {"reports": 0, "logs": 0, "reviews": 0}
+
+    date_pattern = re.compile(r"(?:lkml_)?(\d{4}-\d{2}-\d{2})")
+
+    def _file_date(filename: str) -> str | None:
+        m = date_pattern.match(filename)
+        return m.group(1) if m else None
+
+    # --- Purge old reports ---
+    if reports_dir.exists():
+        for f in list(reports_dir.iterdir()):
+            if not f.is_file() or f.suffix != ".html" or f.name == "index.html":
+                continue
+            file_date = _file_date(f.name)
+            if file_date and file_date < cutoff:
+                f.unlink()
+                counts["reports"] += 1
+                logger.info("Purged report: %s", f.name)
+
+    # --- Purge old logs ---
+    if logs_dir.exists():
+        for f in list(logs_dir.iterdir()):
+            if not f.is_file() or f.suffix != ".log":
+                continue
+            file_date = _file_date(f.name)
+            if file_date and file_date < cutoff:
+                f.unlink()
+                counts["logs"] += 1
+                logger.info("Purged log: %s", f.name)
+
+    # --- Purge old review data ---
+    reviews_dir = reports_dir / "reviews"
+    if reviews_dir.exists():
+        for json_path in list(reviews_dir.glob("*.json")):
+            try:
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+
+            dates = data.get("dates", {})
+            original_count = len(dates)
+            # Remove date entries older than cutoff
+            dates = {d: v for d, v in dates.items() if d >= cutoff}
+
+            if not dates:
+                # No dates remain — delete both JSON and HTML
+                json_path.unlink()
+                html_path = json_path.with_suffix(".html")
+                if html_path.exists():
+                    html_path.unlink()
+                counts["reviews"] += 1
+                logger.info("Purged review (all dates expired): %s", json_path.name)
+            elif len(dates) < original_count:
+                # Some dates removed — rewrite JSON (HTML rebuilt by build_reviews.py)
+                data["dates"] = dates
+                json_path.write_text(
+                    json.dumps(data, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                logger.info(
+                    "Pruned %d old date(s) from review: %s",
+                    original_count - len(dates),
+                    json_path.name,
+                )
+
+    # --- Purge old run_history entries ---
+    history_path = logs_dir / "run_history.json"
+    if history_path.exists():
+        try:
+            history = json.loads(history_path.read_text(encoding="utf-8"))
+            before = len(history)
+            history = [e for e in history if e.get("timestamp", "")[:10] >= cutoff]
+            if len(history) < before:
+                history_path.write_text(
+                    json.dumps(history, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                logger.info(
+                    "Pruned %d old run history entries",
+                    before - len(history),
+                )
+        except (json.JSONDecodeError, OSError):
+            pass
 
     logger.info(
-        "Report generated: %s (%d patches, %d reviews, %d acks in %.1fs)",
-        output_path,
-        daily_report.total_patches,
-        daily_report.total_reviews,
-        daily_report.total_acks,
-        daily_report.generation_time_seconds,
+        "Purge complete: %d reports, %d logs, %d reviews removed (cutoff: %s)",
+        counts["reports"],
+        counts["logs"],
+        counts["reviews"],
+        cutoff,
     )
-    print(f"\nReport: {output_path.resolve()}")
-    return output_path
+    return counts
+
+
+def _record_run(logs_dir: Path, entry: dict) -> None:
+    """Append a run entry to logs/run_history.json, keeping the last 14 days."""
+    history_path = logs_dir / "run_history.json"
+    try:
+        if history_path.exists():
+            history = json.loads(history_path.read_text(encoding="utf-8"))
+        else:
+            history = []
+    except (json.JSONDecodeError, OSError):
+        history = []
+
+    history.append(entry)
+
+    # Keep only entries from the last 14 days
+    cutoff = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    history = [e for e in history if e.get("timestamp", "")[:10] >= cutoff]
+
+    history_path.write_text(
+        json.dumps(history, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
 
 def main():
@@ -540,6 +742,13 @@ def main():
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    # --- Purge-only mode ---
+    if args.purge_only:
+        reports_dir = Path(args.output_dir)
+        logs_dir = Path(args.logs_dir)
+        purge_old_files(reports_dir, logs_dir, args.retention_days)
+        return
 
     # Determine target end date
     if args.date:
@@ -655,6 +864,12 @@ def main():
             "All %d reports generated in %.1fs",
             num_days, total_elapsed,
         )
+
+    # --- Automatic purge (unless --no-purge) ---
+    if not args.no_purge:
+        reports_dir = Path(args.output_dir)
+        logs_dir = Path(args.logs_dir)
+        purge_old_files(reports_dir, logs_dir, args.retention_days)
 
 
 if __name__ == "__main__":

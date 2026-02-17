@@ -1,4 +1,14 @@
-"""HTTP client for lore.kernel.org, adapted from lkml-mcp/client.py."""
+"""HTTP client for lore.kernel.org.
+
+Adapted from lkml-mcp by Lucas Zampieri (zampierilucas/lkml-mcp):
+    https://github.com/zampierilucas/lkml-mcp
+    A Model Context Protocol (MCP) server for accessing Linux Kernel
+    Mailing List threads via lore.kernel.org.
+
+Original code: client.py from lkml-mcp (thread fetching, mbox.gz parsing,
+Atom feed querying). Modified to add date-range querying, rate limiting
+with retry, and raw message retrieval.
+"""
 
 import email
 import gzip

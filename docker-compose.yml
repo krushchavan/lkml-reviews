@@ -19,6 +19,8 @@ services:
       - REPORT_ARGS=${REPORT_ARGS:---llm --verbose}
       # Run a report immediately on container start (cron mode only)
       - RUN_ON_STARTUP=${RUN_ON_STARTUP:-false}
+      # Auto-purge reports/logs older than this many days (default: 30)
+      - RETENTION_DAYS=${RETENTION_DAYS:-30}
       # Linux: set to your user/group ID so files are owned by you (run `id` to check)
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}

@@ -1,7 +1,7 @@
 """Build an index.html for the reports directory.
 
 Scans reports/ and logs/ directories, groups by date, and generates a styled
-index page with links to reports and their associated log files.
+index page with links to reports and their 1:1 associated log files.
 
 Usage:
     python build_index.py                    # Uses reports/ and logs/ in CWD
@@ -10,16 +10,18 @@ Usage:
 
 import argparse
 import html
+import json
 import os
 import re
 from collections import defaultdict
 from pathlib import Path
+from typing import Optional
 
 
 def _extract_date(filename: str) -> str | None:
     """Extract YYYY-MM-DD date from a report or log filename."""
     # Reports: 2025-02-13.html or 2025-02-13_ollama_llama3.1-8b.html
-    # Logs: lkml_2025-02-13_143000.log
+    # Logs: 2025-02-13.log or lkml_2025-02-13.log
     m = re.match(r"(?:lkml_)?(\d{4}-\d{2}-\d{2})", filename)
     return m.group(1) if m else None
 
@@ -49,25 +51,110 @@ def _report_label(filename: str) -> str:
     return "Heuristic"
 
 
-def _log_label(filename: str) -> str:
-    """Build a human-readable label for a log file."""
-    # Single-day: lkml_2025-02-13.log -> "Log"
-    m = re.match(r"lkml_(\d{4}-\d{2}-\d{2})\.log$", filename)
-    if m:
-        return "Log"
-    # Range: lkml_2025-02-13_to_2025-02-15.log -> "Log (Feb 13–15)"
-    m = re.match(r"lkml_(\d{4}-\d{2}-\d{2})_to_(\d{4}-\d{2}-\d{2})\.log$", filename)
-    if m:
-        return "Log"
-    # Legacy format: lkml_2025-02-13_143000.log -> "14:30:00"
-    m = re.match(r"lkml_\d{4}-\d{2}-\d{2}_(\d{2})(\d{2})(\d{2})\.log", filename)
-    if m:
-        return f"{m.group(1)}:{m.group(2)}:{m.group(3)}"
-    return filename
+def _match_log(report_filename: str, log_files: set[str], logs_by_date: dict[str, list[str]]) -> Optional[str]:
+    """Find the log file matching a report.
+
+    Primary: match by shared filename stem (e.g. 2026-02-15.html <-> 2026-02-15.log).
+    Fallback: match legacy log formats by date (lkml_YYYY-MM-DD.log, range logs).
+    """
+    # Primary: exact stem match
+    stem = report_filename.removesuffix(".html")
+    candidate = f"{stem}.log"
+    if candidate in log_files:
+        return candidate
+
+    # Fallback: legacy date-based match
+    date = _extract_date(report_filename)
+    if date and date in logs_by_date:
+        return logs_by_date[date][0]
+
+    return None
+
+
+def _build_run_history_html(logs_dir: Path) -> str:
+    """Build the run history section HTML from logs/run_history.json."""
+    history_path = logs_dir / "run_history.json"
+    if not history_path.exists():
+        return ""
+
+    try:
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+    if not history:
+        return ""
+
+    # Sort newest first
+    history.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+
+    rows = []
+    for entry in history:
+        ts = html.escape(entry.get("timestamp", ""))
+        report_date = html.escape(entry.get("report_date", ""))
+        report_file = entry.get("report_file", "")
+        log_file = entry.get("log_file", "")
+        status = entry.get("status", "unknown")
+        error = entry.get("error", "")
+        duration = entry.get("duration_seconds", 0)
+        patches = entry.get("patches", 0)
+        reviews = entry.get("reviews", 0)
+        acks = entry.get("acks", 0)
+
+        if status == "success":
+            status_html = '<span class="status-ok">OK</span>'
+        else:
+            title = html.escape(error) if error else "Failed"
+            status_html = f'<span class="status-fail" title="{title}">FAIL</span>'
+
+        report_link = f'<a href="{html.escape(report_file)}">{html.escape(report_date)}</a>' if report_file else report_date
+        log_link = f'<a href="/logs/{html.escape(log_file)}" class="log-link">Log</a>' if log_file else "--"
+
+        rows.append(
+            f"<tr>"
+            f"<td>{ts}</td>"
+            f"<td>{report_link}</td>"
+            f"<td>{status_html}</td>"
+            f"<td>{duration:.0f}s</td>"
+            f"<td>{patches}p / {reviews}r / {acks}a</td>"
+            f"<td>{log_link}</td>"
+            f"</tr>"
+        )
+
+    rows_html = "\n            ".join(rows)
+
+    return f"""
+    <h2 class="section-title">Run History (Last 14 Days)</h2>
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Report Date</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Activity</th>
+                <th>Log</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>"""
 
 
 def build_index(reports_dir: Path, logs_dir: Path) -> str:
     """Generate index.html content."""
+    # Collect all log filenames into a set for O(1) lookup
+    log_files: set[str] = set()
+    logs_by_date: dict[str, list[str]] = defaultdict(list)
+    if logs_dir.exists():
+        for f in sorted(logs_dir.iterdir()):
+            if f.suffix == ".log":
+                log_files.add(f.name)
+                date = _extract_date(f.name)
+                if date:
+                    logs_by_date[date].append(f.name)
+
     # Collect reports (exclude index.html, reviews/ subdir entries)
     reports_by_date: dict[str, list[str]] = defaultdict(list)
     if reports_dir.exists():
@@ -85,47 +172,52 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         (reports_dir / "reviews").glob("*.html")
     )
 
-    # Collect logs
-    logs_by_date: dict[str, list[str]] = defaultdict(list)
-    if logs_dir.exists():
-        for f in sorted(logs_dir.iterdir()):
-            if f.suffix == ".log":
-                date = _extract_date(f.name)
-                if date:
-                    logs_by_date[date].append(f.name)
-
     # All dates, newest first
-    all_dates = sorted(set(reports_by_date.keys()) | set(logs_by_date.keys()), reverse=True)
+    all_dates = sorted(reports_by_date.keys(), reverse=True)
 
-    # Build date rows
+    # Track which log files are matched to a report
+    matched_logs: set[str] = set()
+
+    # Build table rows: one row per report, date cell uses rowspan
     rows: list[str] = []
     for date in all_dates:
-        reports = reports_by_date.get(date, [])
-        logs = logs_by_date.get(date, [])
+        reports = reports_by_date[date]
+        num_reports = len(reports)
 
-        report_links = []
-        for r in reports:
-            label = html.escape(_report_label(r))
-            report_links.append(f'<a href="{html.escape(r)}" class="report-link">{label}</a>')
+        for i, report_file in enumerate(reports):
+            report_label_text = html.escape(_report_label(report_file))
+            report_link = f'<a href="{html.escape(report_file)}" class="report-link">{report_label_text}</a>'
 
-        log_links = []
-        for lg in logs:
-            label = html.escape(_log_label(lg))
-            log_links.append(f'<a href="/logs/{html.escape(lg)}" class="log-link">{label}</a>')
+            log_file = _match_log(report_file, log_files, logs_by_date)
+            if log_file:
+                matched_logs.add(log_file)
+                log_link = f'<a href="/logs/{html.escape(log_file)}" class="log-link">Log</a>'
+            else:
+                log_link = '<span class="none">--</span>'
 
-        reports_html = "\n".join(report_links) if report_links else '<span class="none">No reports</span>'
-        logs_html = "\n".join(log_links) if log_links else '<span class="none">No logs</span>'
+            if i == 0:
+                rowspan = f' rowspan="{num_reports}"' if num_reports > 1 else ""
+                rows.append(
+                    f'<tr>'
+                    f'<td class="date-cell"{rowspan}>{html.escape(date)}</td>'
+                    f'<td class="reports-cell">{report_link}</td>'
+                    f'<td class="logs-cell">{log_link}</td>'
+                    f'</tr>'
+                )
+            else:
+                rows.append(
+                    f'<tr>'
+                    f'<td class="reports-cell">{report_link}</td>'
+                    f'<td class="logs-cell">{log_link}</td>'
+                    f'</tr>'
+                )
 
-        rows.append(f"""
-        <tr>
-            <td class="date-cell">{html.escape(date)}</td>
-            <td class="reports-cell">{reports_html}</td>
-            <td class="logs-cell">{logs_html}</td>
-        </tr>""")
-
-    rows_html = "\n".join(rows)
+    rows_html = "\n            ".join(rows)
     total_reports = sum(len(v) for v in reports_by_date.values())
-    total_logs = sum(len(v) for v in logs_by_date.values())
+    total_logs = len(matched_logs)
+
+    # Build run history section
+    run_history_html = _build_run_history_html(logs_dir)
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -218,10 +310,7 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             gap: 4px;
         }}
         .logs-cell {{
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            width: 160px;
+            width: 100px;
         }}
         .report-link {{
             display: inline-block;
@@ -271,6 +360,37 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         .reviews-link a:hover {{
             text-decoration: underline;
         }}
+        .section-title {{
+            font-size: 1.2em;
+            color: #1a1a1a;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }}
+        .history-table {{
+            margin-top: 8px;
+        }}
+        .history-table td {{
+            font-size: 0.85em;
+        }}
+        .status-ok {{
+            display: inline-block;
+            padding: 1px 8px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 10px;
+            font-size: 0.82em;
+            font-weight: 600;
+        }}
+        .status-fail {{
+            display: inline-block;
+            padding: 1px 8px;
+            background: #ffebee;
+            color: #c62828;
+            border-radius: 10px;
+            font-size: 0.82em;
+            font-weight: 600;
+            cursor: help;
+        }}
         footer {{
             text-align: center;
             color: #aaa;
@@ -305,14 +425,16 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         <thead>
             <tr>
                 <th>Date</th>
-                <th>Reports</th>
-                <th>Logs</th>
+                <th>Report</th>
+                <th>Log</th>
             </tr>
         </thead>
         <tbody>
             {rows_html}
         </tbody>
     </table>
+
+    {run_history_html}
 
     <footer>LKML Daily Activity Tracker</footer>
 </body>

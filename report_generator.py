@@ -472,6 +472,7 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
 def generate_html_report(
     daily_report: DailyReport,
     review_links: Optional[dict[str, str]] = None,
+    log_filename: Optional[str] = None,
 ) -> str:
     """Generate a complete self-contained HTML report.
 
@@ -480,6 +481,7 @@ def generate_html_report(
         review_links: Optional mapping of message_id -> slug for review detail pages.
                       When provided, review comments are rendered as compact summaries
                       with links to per-patchset detail pages.
+        log_filename: Optional log filename (e.g. "2026-02-15.log") for "View log" link.
 
     Returns:
         Complete HTML string ready to write to file.
@@ -873,6 +875,13 @@ def generate_html_report(
             margin-top: 32px;
             padding: 16px;
         }}
+        footer a {{
+            color: #999;
+            text-decoration: none;
+        }}
+        footer a:hover {{
+            text-decoration: underline;
+        }}
         .llm-badge {{
             display: inline-block;
             background: #e8f5e9;
@@ -889,6 +898,17 @@ def generate_html_report(
             font-size: 0.85em;
             color: #888;
             margin-top: 4px;
+        }}
+        .log-link {{
+            font-size: 0.85em;
+            margin-top: 4px;
+        }}
+        .log-link a {{
+            color: #0366d6;
+            text-decoration: none;
+        }}
+        .log-link a:hover {{
+            text-decoration: underline;
         }}
         .llm-analyses {{
             margin-top: 8px;
@@ -925,6 +945,7 @@ def generate_html_report(
     <h1>LKML Activity Report{' <span class="llm-badge">LLM: ' + _esc(llm_label) + '</span>' if llm_label else ''}</h1>
     <h2>{_esc(daily_report.date)} &mdash; Generated {_esc(now)}</h2>
     {'<p class="analysis-mode">Analysis: LLM-enriched (' + _esc(llm_label) + ')</p>' if llm_label else '<p class="analysis-mode">Analysis: Heuristic</p>'}
+    {'<p class="log-link"><a href="/logs/' + _esc(log_filename) + '">View generation log</a></p>' if log_filename else ''}
 
     {stats_section}
 
@@ -935,6 +956,7 @@ def generate_html_report(
         &bull; {len(daily_report.developer_reports)} developers tracked
         &bull; Data from lore.kernel.org
         {'&bull; LLM: ' + _esc(llm_label) if llm_label else '&bull; Heuristic analysis'}
+        {'&bull; <a href="/logs/' + _esc(log_filename) + '">Log</a>' if log_filename else ''}
     </footer>
 </body>
 </html>"""
