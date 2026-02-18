@@ -195,6 +195,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print raw LLM JSON response for debugging.",
     )
+    llm_group.add_argument(
+        "--llm-dump",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="Dump all raw LLM responses to DIR (errors always dumped to logs/llm_dumps/).",
+    )
+    llm_group.add_argument(
+        "--llm-monolithic",
+        action="store_true",
+        help="Force monolithic LLM prompts (disable per-reviewer decomposition).",
+    )
 
     return parser.parse_args()
 
@@ -315,10 +327,14 @@ def main():
 
     # --- Run LLM analyses ---
     if backends_to_run:
+        from pathlib import Path
+
         cache = None
         if not args.llm_no_cache:
             today = datetime.now().strftime("%Y-%m-%d")
             cache = LLMCache(date_str=today)
+
+        dump_dir = Path(args.llm_dump) if args.llm_dump else None
 
         for backend_label, backend in backends_to_run:
             print(f"\nRunning LLM analysis ({backend_label})...")
@@ -341,7 +357,9 @@ def main():
                 print()
 
             llm_result = analyze_thread_llm(
-                thread_messages, activity_item, backend, cache
+                thread_messages, activity_item, backend, cache,
+                dump_dir=dump_dir,
+                force_monolithic=getattr(args, 'llm_monolithic', False),
             )
             _print_summary(llm_result, f"LLM ANALYSIS ({backend_label})")
 

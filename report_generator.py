@@ -99,6 +99,9 @@ def _render_review_comment(rc: ReviewComment) -> str:
 
     # Per-reviewer sentiment badge
     parts.append(_sentiment_badge(rc.sentiment))
+
+    # Per-reviewer analysis source badge
+    parts.append(_analysis_source_badge(rc.analysis_source))
     parts.append('</div>')
 
     # Comment summary text
@@ -145,6 +148,26 @@ def _render_compact_reviews(conv: ConversationSummary, review_link: str) -> str:
     return "\n".join(parts)
 
 
+_ANALYSIS_SOURCE_STYLES = {
+    "heuristic": ("#6c4b00", "#ffeeba", "Heuristic"),
+    "llm": ("#004085", "#cce5ff", "LLM"),
+    "llm-per-reviewer": ("#004085", "#cce5ff", "LLM (per-reviewer)"),
+    "llm-fallback-heuristic": ("#721c24", "#f8d7da", "LLM \u2192 Heuristic"),
+}
+
+
+def _analysis_source_badge(source: str) -> str:
+    """Render a small badge indicating whether analysis came from LLM or heuristic."""
+    color, bg, label = _ANALYSIS_SOURCE_STYLES.get(
+        source, ("#383d41", "#e2e3e5", source)
+    )
+    return (
+        f'<span class="analysis-source-badge" style="color:{color};background:{bg}"'
+        f' title="Analysis source: {_esc(label)}">'
+        f'{label}</span>'
+    )
+
+
 def _render_conversation_body(
     conv: ConversationSummary, review_link: Optional[str] = None
 ) -> str:
@@ -161,6 +184,9 @@ def _render_conversation_body(
 
     # Sentiment badge
     parts.append(_sentiment_badge(conv.sentiment))
+
+    # Analysis source badge (heuristic / LLM / LLM → Heuristic fallback)
+    parts.append(_analysis_source_badge(conv.analysis_source))
 
     # Discussion progress badge
     if conv.discussion_progress:
@@ -455,6 +481,7 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                     "sentiment_signals": rc.sentiment_signals,
                     "has_inline_review": rc.has_inline_review,
                     "tags_given": rc.tags_given,
+                    "analysis_source": rc.analysis_source,
                 })
             results.append({
                 "message_id": item.message_id,
@@ -464,6 +491,7 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                 "developer": dr.developer.name,
                 "date": daily_report.date,
                 "report_file": report_filename,
+                "analysis_source": conv.analysis_source,
                 "reviews": reviews,
             })
     return results
@@ -738,6 +766,16 @@ def generate_html_report(
             font-weight: 600;
             margin-left: 8px;
             vertical-align: middle;
+        }}
+        .analysis-source-badge {{
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 0.65em;
+            font-weight: 600;
+            margin-left: 6px;
+            vertical-align: middle;
+            border: 1px solid rgba(0,0,0,0.1);
         }}
         .progress-detail {{
             margin-top: 4px;

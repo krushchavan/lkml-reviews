@@ -22,6 +22,13 @@ _SENTIMENT_COLORS = {
     "neutral": ("#383d41", "#e2e3e5"),
 }
 
+_ANALYSIS_SOURCE_STYLES = {
+    "heuristic": ("#6c4b00", "#ffeeba", "Heuristic"),
+    "llm": ("#004085", "#cce5ff", "LLM"),
+    "llm-per-reviewer": ("#004085", "#cce5ff", "LLM (per-reviewer)"),
+    "llm-fallback-heuristic": ("#721c24", "#f8d7da", "LLM \u2192 Heuristic"),
+}
+
 _SENTIMENT_LABELS = {
     "positive": "Positive",
     "needs_work": "Needs Work",
@@ -43,6 +50,18 @@ def _sentiment_badge(sentiment: str) -> str:
     )
 
 
+def _analysis_source_badge(source: str) -> str:
+    """Render a small badge indicating whether analysis came from LLM or heuristic."""
+    color, bg, label = _ANALYSIS_SOURCE_STYLES.get(
+        source, ("#383d41", "#e2e3e5", source)
+    )
+    return (
+        f'<span class="analysis-source-badge" style="color:{color};background:{bg}"'
+        f' title="Analysis source: {_esc(label)}">'
+        f'{label}</span>'
+    )
+
+
 def _render_review(review: dict) -> str:
     """Render a single review comment block."""
     parts = []
@@ -59,6 +78,11 @@ def _render_review(review: dict) -> str:
         parts.append(f'<span class="review-tag-badge">{_esc(tag)}</span>')
 
     parts.append(_sentiment_badge(review.get("sentiment", "neutral")))
+
+    # Per-reviewer analysis source badge
+    rc_source = review.get("analysis_source", "")
+    if rc_source:
+        parts.append(_analysis_source_badge(rc_source))
     parts.append('</div>')
 
     # Summary text
@@ -102,7 +126,9 @@ def build_review_html(data: dict) -> str:
         parts.append('</div>')
 
         if developer:
-            parts.append(f'<div class="developer-name">Developer: {_esc(developer)}</div>')
+            analysis_source = date_data.get("analysis_source", "")
+            source_html = f" {_analysis_source_badge(analysis_source)}" if analysis_source else ""
+            parts.append(f'<div class="developer-name">Developer: {_esc(developer)}{source_html}</div>')
 
         if reviews:
             parts.append('<div class="review-comments">')
@@ -284,6 +310,16 @@ def build_review_html(data: dict) -> str:
             color: #aaa;
             font-size: 0.85em;
             font-style: italic;
+        }}
+        .analysis-source-badge {{
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 6px;
+            vertical-align: middle;
+            border: 1px solid rgba(0,0,0,0.1);
         }}
         footer {{
             text-align: center;

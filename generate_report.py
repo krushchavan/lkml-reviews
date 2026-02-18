@@ -153,6 +153,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable disk caching of LLM results.",
     )
+    llm_group.add_argument(
+        "--llm-dump",
+        type=str,
+        default=None,
+        metavar="DIR",
+        help="Dump all raw LLM responses to DIR (errors always dumped to logs/llm_dumps/).",
+    )
+    llm_group.add_argument(
+        "--llm-monolithic",
+        action="store_true",
+        help="Force monolithic LLM prompts (disable per-reviewer decomposition for Ollama).",
+    )
 
     # Purge options
     purge_group = parser.add_argument_group("Purge / retention")
@@ -223,6 +235,8 @@ def process_developer(
     lookback_days: int = 14,
     llm_backends: Optional[dict[str, LLMBackend]] = None,
     llm_cache: Optional[LLMCache] = None,
+    llm_dump_dir: Optional[Path] = None,
+    force_monolithic: bool = False,
 ) -> DeveloperReport:
     """Fetch and classify all activity for one developer on one date.
 
@@ -415,7 +429,9 @@ def process_developer(
                 # Run each backend and collect attributed analyses
                 for backend_name, backend in llm_backends.items():
                     summary = analyze_thread_llm(
-                        thread_messages, item, backend, llm_cache
+                        thread_messages, item, backend, llm_cache,
+                        dump_dir=llm_dump_dir,
+                        force_monolithic=force_monolithic,
                     )
                     item.llm_analyses.append(LLMAnalysis(
                         backend=backend_name,
@@ -493,10 +509,13 @@ def generate_single_report(
         for i, dev in enumerate(developers, 1):
             logger.info("[%d/%d] Processing %s...", i, len(developers), dev.name)
             try:
+                llm_dump_dir = Path(args.llm_dump) if args.llm_dump else None
                 dev_report = process_developer(
                     client, dev, date_lore, args.skip_threads,
                     llm_backends=llm_backends if llm_backends else None,
                     llm_cache=llm_cache,
+                    llm_dump_dir=llm_dump_dir,
+                    force_monolithic=getattr(args, 'llm_monolithic', False),
                 )
             except Exception as e:
                 logger.error("Unexpected error processing %s: %s", dev.name, e)
@@ -536,11 +555,14 @@ def generate_single_report(
 
             # Preserve existing dates, update/add current date
             dates = existing.get("dates", {})
-            dates[item_data["date"]] = {
+            date_entry = {
                 "report_file": item_data["report_file"],
                 "developer": item_data["developer"],
                 "reviews": item_data["reviews"],
             }
+            if item_data.get("analysis_source"):
+                date_entry["analysis_source"] = item_data["analysis_source"]
+            dates[item_data["date"]] = date_entry
 
             merged = {
                 "thread_id": msg_id,

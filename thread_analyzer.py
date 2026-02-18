@@ -853,6 +853,7 @@ def _extract_review_comments(
             sentiment_signals=signals,
             has_inline_review=has_inline,
             tags_given=unique_tags,
+            analysis_source="heuristic",
         ))
 
     # Sort: patch author last, then by number of messages (most active first)
@@ -914,4 +915,5 @@ def analyze_thread(
         discussion_progress=progress,
         progress_detail=progress_detail,
         review_comments=review_comments,
+        analysis_source="heuristic",
     )

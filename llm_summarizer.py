@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -23,7 +24,17 @@ from models import (
     ReviewComment,
     Sentiment,
 )
-from thread_analyzer import analyze_thread  # heuristic fallback
+from thread_analyzer import (
+    analyze_thread,  # heuristic fallback
+    _extract_author_short,
+    _determine_discussion_progress,
+    _has_inline_review,
+    _extract_tags_from_body,
+    _is_trivial_message,
+    _extract_comment_body,
+    _determine_message_sentiment,
+    _extract_patch_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,37 +115,75 @@ class OllamaBackend(LLMBackend):
         except Exception as e:
             raise RuntimeError(f"Failed to pull model '{self.model}': {e}")
 
-    def complete(self, prompt: str, max_tokens: int = 2048) -> str:
-        # Scale timeout based on prompt size — local models need more time
-        # for large inputs.  Rough estimates for 8B models on consumer GPUs:
-        #   - Prefill: ~500-1000 tok/s → 5K chars ≈ 1-3s
-        #   - Generation: ~20-50 tok/s → 2048 tokens ≈ 40-100s
-        # Base: 180s, +30s per 5K chars of prompt above 5K.
+    def complete(self, prompt: str, max_tokens: int = 4096) -> str:
+        # Scale timeout based on prompt size — large models on CPU need
+        # significant time just for prompt evaluation before the first token.
+        # A 27B model on CPU can take 10-30 minutes to evaluate a 30K prompt.
+        # Base: 600s, +60s per 5K chars above 5K, hard cap 3600s (1 hour).
         prompt_len = len(prompt)
         extra_chunks = max(0, (prompt_len - 5000)) // 5000
-        timeout = 180 + extra_chunks * 30
-        timeout = min(timeout, 600)  # hard cap at 10 minutes
-        logger.debug(
-            "Ollama request: model=%s, prompt=%d chars, timeout=%ds",
-            self.model, prompt_len, timeout,
+        timeout = 600 + extra_chunks * 60
+        timeout = min(timeout, 3600)  # hard cap at 1 hour
+        logger.info(
+            "Ollama request: model=%s, prompt=%d chars, max_tokens=%d, timeout=%ds",
+            self.model, prompt_len, max_tokens, timeout,
         )
 
+        # Use streaming to accumulate the full response reliably.
+        # Even with stream=False, Ollama can send chunked HTTP responses
+        # that may be truncated.  Streaming token-by-token avoids this.
         resp = requests.post(
             f"{self.base_url}/api/generate",
             json={
                 "model": self.model,
                 "prompt": prompt,
-                "format": "json",  # Force JSON output mode
-                "stream": False,
+                "format": "json",
+                "stream": True,
                 "options": {
                     "num_predict": max_tokens,
                     "temperature": 0.2,
                 },
             },
             timeout=timeout,
+            stream=True,
         )
         resp.raise_for_status()
-        return resp.json().get("response", "")
+
+        # Accumulate streamed response tokens
+        full_response = []
+        done = False
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError:
+                logger.warning("Ollama: unparseable chunk: %s", line[:200])
+                continue
+            token = chunk.get("response", "")
+            if token:
+                full_response.append(token)
+            if chunk.get("done", False):
+                done = True
+                # Log generation stats if available
+                total_duration = chunk.get("total_duration", 0)
+                eval_count = chunk.get("eval_count", 0)
+                if total_duration:
+                    secs = total_duration / 1e9
+                    tps = eval_count / secs if secs > 0 else 0
+                    logger.info(
+                        "Ollama done: %d tokens in %.1fs (%.1f tok/s)",
+                        eval_count, secs, tps,
+                    )
+                break
+
+        result = "".join(full_response)
+        if not done:
+            logger.warning(
+                "Ollama stream ended without done=true, response may be truncated (%d chars so far)",
+                len(result),
+            )
+        return result
 
 
 class AnthropicBackend(LLMBackend):
@@ -347,12 +396,18 @@ IMPORTANT:
 - Use EXACTLY the field names shown above.
 - All sentiment/progress values must be UPPERCASE.
 - has_inline_review must be a JSON boolean (true/false), not a string.
+- Your response MUST contain these top-level keys: "patch_summary", "overall_sentiment",
+  "overall_sentiment_signals", "discussion_progress", "progress_detail", "review_comments".
+- Do NOT use any other top-level keys such as "thread_id", "topic", "participants", "messages",
+  "thread", "summary", or "analysis". Only the six keys listed above are allowed.
 
 --- THREAD MESSAGES ---
 {thread_text}
 
 --- END OF THREAD ---
-REMINDER: Respond with ONLY a JSON object. No explanatory text. Start with {{ and end with }}."""
+Produce your analytical JSON now. Your response MUST be a single JSON object with EXACTLY these
+six top-level keys: "patch_summary", "overall_sentiment", "overall_sentiment_signals",
+"discussion_progress", "progress_detail", "review_comments". No other keys. Start with {{ end with }}."""
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +461,45 @@ def _parse_llm_response(raw_response: str) -> Optional[Dict]:
         return None
 
     # Normalize the parsed dict to handle model-to-model variations
-    return _normalize_llm_output(parsed)
+    normalized = _normalize_llm_output(parsed)
+
+    # Validate value types — reject structurally broken responses where the
+    # model invented its own schema (e.g. patch_summary is a dict instead of
+    # a string, or sentiment values are not in the allowed set).
+    _VALID_SENTIMENTS = {"POSITIVE", "NEEDS_WORK", "CONTENTIOUS", "NEUTRAL"}
+    _VALID_PROGRESS = {
+        "ACCEPTED", "CHANGES_REQUESTED", "UNDER_REVIEW",
+        "NEW_VERSION_EXPECTED", "WAITING_FOR_REVIEW", "SUPERSEDED", "RFC",
+    }
+
+    issues = []
+    if not isinstance(normalized.get("patch_summary"), str):
+        issues.append(f"patch_summary is {type(normalized.get('patch_summary')).__name__}, not str")
+    if normalized.get("overall_sentiment") not in _VALID_SENTIMENTS:
+        issues.append(f"overall_sentiment '{normalized.get('overall_sentiment')}' not in {_VALID_SENTIMENTS}")
+    if not isinstance(normalized.get("overall_sentiment_signals"), list):
+        issues.append("overall_sentiment_signals is not a list")
+    if normalized.get("discussion_progress") not in _VALID_PROGRESS and normalized.get("discussion_progress") != "":
+        issues.append(f"discussion_progress '{normalized.get('discussion_progress')}' not in {_VALID_PROGRESS}")
+    if not isinstance(normalized.get("progress_detail"), str):
+        issues.append(f"progress_detail is {type(normalized.get('progress_detail')).__name__}, not str")
+    if not isinstance(normalized.get("review_comments"), list):
+        issues.append("review_comments is not a list")
+    else:
+        for i, rc in enumerate(normalized["review_comments"]):
+            if not isinstance(rc, dict):
+                issues.append(f"review_comments[{i}] is not a dict")
+            elif not rc.get("summary"):
+                issues.append(f"review_comments[{i}] (author={rc.get('author', '?')}) has empty summary")
+
+    if issues:
+        logger.warning(
+            "LLM response has structural issues: %s",
+            "; ".join(issues),
+        )
+        return None
+
+    return normalized
 
 
 def _coerce_bool(value) -> bool:
@@ -637,6 +730,7 @@ def _build_conversation_summary(
             sentiment_signals=rc_data.get("sentiment_signals", []),
             has_inline_review=bool(rc_data.get("has_inline_review", False)),
             tags_given=rc_data.get("tags_given", []),
+            analysis_source="llm",
         ))
 
     overall_sentiment = _map_sentiment(
@@ -655,6 +749,7 @@ def _build_conversation_summary(
         discussion_progress=progress,
         progress_detail=parsed.get("progress_detail", ""),
         review_comments=review_comments,
+        analysis_source="llm",
     )
 
 
@@ -708,14 +803,577 @@ def _count_participants_simple(messages: List[Dict]) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Per-reviewer decomposition (for Ollama on large threads)
+# ---------------------------------------------------------------------------
+
+def _extract_email(from_field: str) -> str:
+    """Extract lowercase email from a 'Name <email>' field."""
+    match = re.search(r"<([^>]+)>", from_field.lower())
+    if match:
+        return match.group(1)
+    return from_field.strip().lower()
+
+
+def _should_use_per_reviewer_mode(
+    backend: "LLMBackend",
+    messages: List[Dict],
+    force_monolithic: bool = False,
+) -> bool:
+    """Decide whether to decompose into per-reviewer prompts.
+
+    Triggers when: Ollama backend + thread has reviewers + total body > 8K chars.
+    Always false for Anthropic (handles large prompts fine).
+    """
+    if force_monolithic:
+        return False
+    if not isinstance(backend, OllamaBackend):
+        return False
+    if len(messages) <= 1:
+        return False
+
+    root_email = _extract_email(messages[0].get("from", ""))
+    reviewer_emails = set()
+    for msg in messages[1:]:
+        email = _extract_email(msg.get("from", ""))
+        if email and email != root_email:
+            reviewer_emails.add(email)
+
+    if len(reviewer_emails) < 1:
+        return False
+
+    total_chars = sum(len(msg.get("body", "")) for msg in messages)
+    return total_chars > 8000
+
+
+def _group_messages_by_reviewer(
+    messages: List[Dict],
+) -> Dict[str, Dict]:
+    """Group thread messages by reviewer email.
+
+    Returns dict mapping reviewer_email -> {
+        "name": "First Last",
+        "email": "user@domain.com",
+        "messages": [msg_dict, ...],
+        "is_author": bool,
+    }
+    """
+    root_email = _extract_email(messages[0].get("from", ""))
+
+    groups: Dict[str, Dict] = {}
+    for msg in messages[1:]:  # Skip root message
+        from_field = msg.get("from", "")
+        email = _extract_email(from_field)
+
+        if email not in groups:
+            groups[email] = {
+                "name": _extract_author_short(from_field),
+                "email": email,
+                "messages": [],
+                "is_author": (email == root_email),
+            }
+        groups[email]["messages"].append(msg)
+
+    return groups
+
+
+def _build_patch_context_text(messages: List[Dict], max_chars: int = 3000) -> str:
+    """Build text from the first (root) message only, for patch context."""
+    if not messages:
+        return ""
+    return _build_thread_text(messages[:1], max_chars=max_chars)
+
+
+def _build_patch_summary_prompt(patch_text: str, subject: str) -> str:
+    """Build a focused prompt for summarizing the patch description only."""
+    return f"""You are a senior Linux kernel developer. Summarize what this patch does.
+
+Thread subject: {subject}
+
+Return a JSON object with exactly one field:
+{{
+  "patch_summary": "2-4 sentence technical summary of what the patch does, the problem it solves, and the approach taken."
+}}
+
+IMPORTANT:
+- Return ONLY valid JSON. No markdown fences, no other text.
+- Write in your own words. Do NOT copy text from the patch.
+
+--- PATCH DESCRIPTION ---
+{patch_text}
+
+--- END ---
+Return your JSON now. Start with {{ end with }}."""
+
+
+def _parse_patch_summary_response(raw: str) -> Optional[str]:
+    """Parse the LLM response from the patch summary prompt."""
+    text = raw.strip()
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+    text = re.sub(r"\n?```\s*$", "", text)
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    if start >= 0 and end > start:
+        text = text[start:end]
+    else:
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    summary = parsed.get("patch_summary", "")
+    if isinstance(summary, str) and summary.strip():
+        return _clean_summary_text(summary)
+    return None
+
+
+def _build_reviewer_prompt(
+    patch_context: str,
+    reviewer_name: str,
+    reviewer_messages: List[Dict],
+    subject: str,
+) -> str:
+    """Build a focused prompt for analyzing a single reviewer's contribution."""
+    sentiment_values = "POSITIVE, NEEDS_WORK, CONTENTIOUS, NEUTRAL"
+
+    # Build text for this reviewer's messages only
+    reviewer_text = _build_thread_text(reviewer_messages, max_chars=5000)
+
+    return f"""You are a senior Linux kernel developer analyzing ONE reviewer's comments on a patch.
+
+Thread subject: {subject}
+Reviewer: {reviewer_name}
+
+The original patch description is provided for context, followed by this reviewer's messages.
+
+Return a JSON object with exactly these fields:
+{{
+  "summary": "2-3 sentence analytical summary of what this reviewer raised",
+  "sentiment": "one of: {sentiment_values}",
+  "sentiment_signals": ["signal1", "signal2"],
+  "has_inline_review": true,
+  "tags_given": ["Reviewed-by"]
+}}
+
+Field rules:
+- "summary": Written in YOUR OWN words. Describe WHAT the reviewer raised, WHETHER they
+  approved or objected, and WHAT specific technical concerns they made. Do NOT quote emails.
+- "sentiment": CONTENTIOUS = strong disagreement/NACK. NEEDS_WORK = requested changes.
+  POSITIVE = LGTM/approved. NEUTRAL = no clear signal.
+- "has_inline_review": true if the reviewer quoted code and commented inline.
+- "tags_given": Only formal kernel tags (Reviewed-by, Acked-by, Tested-by) that the
+  reviewer explicitly gave. Empty list if none.
+
+IMPORTANT:
+- Return ONLY valid JSON. No markdown fences, no explanation.
+- All sentiment values must be UPPERCASE.
+- has_inline_review must be a JSON boolean (true/false).
+
+--- PATCH DESCRIPTION (for context) ---
+{patch_context}
+
+--- REVIEWER MESSAGES ({reviewer_name}) ---
+{reviewer_text}
+
+--- END ---
+Return your JSON now. Start with {{ end with }}."""
+
+
+def _parse_reviewer_response(raw: str, reviewer_name: str) -> Optional[Dict]:
+    """Parse a single reviewer's LLM response into a dict."""
+    text = raw.strip()
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+    text = re.sub(r"\n?```\s*$", "", text)
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    if start >= 0 and end > start:
+        text = text[start:end]
+    else:
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(parsed, dict):
+        return None
+
+    _VALID = {"POSITIVE", "NEEDS_WORK", "CONTENTIOUS", "NEUTRAL"}
+
+    summary = _clean_summary_text(str(
+        parsed.get("summary") or parsed.get("comment") or parsed.get("review", "")
+    ))
+    sentiment = str(parsed.get("sentiment", "NEUTRAL")).upper().strip()
+    if sentiment not in _VALID:
+        sentiment = "NEUTRAL"
+
+    if not summary:
+        return None
+
+    return {
+        "author": reviewer_name,
+        "summary": summary,
+        "sentiment": sentiment,
+        "sentiment_signals": _coerce_str_list(
+            parsed.get("sentiment_signals") or parsed.get("signals") or []
+        ),
+        "has_inline_review": _coerce_bool(
+            parsed.get("has_inline_review", False)
+        ),
+        "tags_given": _coerce_str_list(
+            parsed.get("tags_given") or parsed.get("tags") or []
+        ),
+        "analysis_source": "llm",
+    }
+
+
+def _derive_overall_sentiment(
+    reviewer_results: List[Dict],
+) -> Tuple[str, List[str]]:
+    """Derive overall sentiment from per-reviewer results.
+
+    Priority: CONTENTIOUS > NEEDS_WORK > POSITIVE > NEUTRAL.
+    """
+    all_signals: List[str] = []
+    sentiments: set = set()
+
+    for rc in reviewer_results:
+        sent = rc.get("sentiment", "NEUTRAL")
+        sentiments.add(sent)
+        all_signals.extend(rc.get("sentiment_signals", []))
+
+    # Deduplicate signals preserving order
+    seen: set = set()
+    unique_signals: List[str] = []
+    for s in all_signals:
+        if s not in seen:
+            seen.add(s)
+            unique_signals.append(s)
+
+    if "CONTENTIOUS" in sentiments:
+        return "CONTENTIOUS", unique_signals
+    if "NEEDS_WORK" in sentiments:
+        return "NEEDS_WORK", unique_signals
+    if "POSITIVE" in sentiments:
+        return "POSITIVE", unique_signals
+    return "NEUTRAL", unique_signals
+
+
+def _heuristic_fallback_for_reviewer(
+    reviewer_name: str,
+    reviewer_msgs: List[Dict],
+    is_author: bool,
+) -> Optional[Dict]:
+    """Build a heuristic ReviewComment dict for a single reviewer (fallback)."""
+    all_bodies: List[str] = []
+    has_inline = False
+    all_tags: List[str] = []
+
+    for msg in reviewer_msgs:
+        body = msg.get("body", "")
+        if _is_trivial_message(body):
+            all_tags.extend(_extract_tags_from_body(body))
+            continue
+        all_bodies.append(body)
+        if _has_inline_review(body):
+            has_inline = True
+        all_tags.extend(_extract_tags_from_body(body))
+
+    if not all_bodies and not all_tags:
+        return None
+
+    # Build summary
+    comment_parts: List[str] = []
+    for i, body in enumerate(all_bodies):
+        budget = 400 if i == 0 else 250
+        extracted = _extract_comment_body(body, max_chars=budget)
+        if extracted:
+            comment_parts.append(extracted)
+
+    if comment_parts:
+        combined = " ".join(comment_parts)
+        if len(combined) > 500:
+            combined = combined[:500].rsplit(" ", 1)[0] + "..."
+        summary = combined
+    elif all_tags:
+        unique_tags = list(dict.fromkeys(all_tags))
+        summary = f"Gave {', '.join(unique_tags)}"
+    else:
+        return None
+
+    all_text = " ".join(all_bodies)
+    sentiment, signals = _determine_message_sentiment(all_text)
+
+    label = f"{reviewer_name} (author)" if is_author else reviewer_name
+    unique_tags = list(dict.fromkeys(all_tags))
+
+    return {
+        "author": label,
+        "summary": summary,
+        "sentiment": sentiment.value.upper(),
+        "sentiment_signals": signals,
+        "has_inline_review": has_inline,
+        "tags_given": unique_tags,
+        "analysis_source": "heuristic",
+    }
+
+
+def _compute_per_reviewer_cache_key(
+    message_id: str,
+    messages: List[Dict],
+    backend: Optional["LLMBackend"],
+    suffix: str,
+) -> str:
+    """Cache key for a per-reviewer sub-call."""
+    base_key = _compute_cache_key(message_id, messages, backend)
+    return f"{base_key}_pr_{suffix}"
+
+
+def _analyze_per_reviewer(
+    messages: List[Dict],
+    activity_item: ActivityItem,
+    backend: "LLMBackend",
+    cache: Optional[LLMCache] = None,
+    dump_dir: Optional[Path] = None,
+) -> ConversationSummary:
+    """Analyze a thread by decomposing into per-reviewer LLM calls.
+
+    1. Summarize the patch (one small LLM call)
+    2. Analyze each reviewer's messages individually (N small LLM calls)
+    3. Derive overall sentiment/progress programmatically
+    4. Assemble into ConversationSummary
+
+    Individual reviewer failures fall back to heuristic for that reviewer only.
+    """
+    is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
+    backend_label = f"{type(backend).__name__}({backend.model})"
+    participant_count = _count_participants_simple(messages)
+
+    # --- Step 1: Patch Summary ---
+    patch_summary = ""
+    if is_patch:
+        ps_cache_key = _compute_per_reviewer_cache_key(
+            activity_item.message_id, messages, backend, "patch_summary"
+        )
+        cached_ps = cache.get(ps_cache_key) if cache else None
+
+        if cached_ps is not None:
+            patch_summary = cached_ps.get("patch_summary", "")
+            logger.debug("Per-reviewer cache hit for patch_summary: %s", activity_item.message_id)
+        else:
+            patch_context_text = _build_patch_context_text(messages)
+            ps_prompt = _build_patch_summary_prompt(patch_context_text, activity_item.subject)
+
+            logger.info(
+                "Per-reviewer: calling %s for patch_summary (%d chars prompt)",
+                backend_label, len(ps_prompt),
+            )
+            try:
+                raw = backend.complete(ps_prompt, max_tokens=512)
+                patch_summary = _parse_patch_summary_response(raw) or ""
+
+                if patch_summary and cache:
+                    cache.put(ps_cache_key, {"patch_summary": patch_summary})
+
+                if dump_dir:
+                    _dump_llm_response(
+                        dump_dir, activity_item.message_id + "_patch_summary",
+                        backend_label, raw, ps_prompt, is_error=(not patch_summary),
+                    )
+                logger.info("Per-reviewer: patch_summary OK (%d chars)", len(patch_summary))
+            except Exception as e:
+                logger.warning("Patch summary LLM call failed: %s — using heuristic", e)
+                patch_summary = _extract_patch_summary(messages, activity_item.subject)
+
+    # --- Step 2: Per-Reviewer Analysis ---
+    reviewer_groups = _group_messages_by_reviewer(messages)
+    patch_context_text = _build_patch_context_text(messages, max_chars=2000)
+
+    reviewer_results: List[Dict] = []
+
+    for email, group_info in reviewer_groups.items():
+        reviewer_name = group_info["name"]
+        reviewer_msgs = group_info["messages"]
+        is_author = group_info["is_author"]
+
+        # Check for substantive messages
+        has_substance = any(
+            not _is_trivial_message(m.get("body", "")) for m in reviewer_msgs
+        )
+        if not has_substance:
+            # Tag-only contributor — capture tags via heuristic, no LLM needed
+            tags: List[str] = []
+            for m in reviewer_msgs:
+                tags.extend(_extract_tags_from_body(m.get("body", "")))
+            if tags:
+                unique_tags = list(dict.fromkeys(tags))
+                label = f"{reviewer_name} (author)" if is_author else reviewer_name
+                reviewer_results.append({
+                    "author": label,
+                    "summary": f"Gave {', '.join(unique_tags)}",
+                    "sentiment": "POSITIVE",
+                    "sentiment_signals": [],
+                    "has_inline_review": False,
+                    "tags_given": unique_tags,
+                    "analysis_source": "heuristic",
+                })
+            continue
+
+        # Check per-reviewer cache
+        rv_cache_key = _compute_per_reviewer_cache_key(
+            activity_item.message_id, messages, backend, f"reviewer_{email}"
+        )
+        cached_rv = cache.get(rv_cache_key) if cache else None
+
+        if cached_rv is not None:
+            reviewer_results.append(cached_rv)
+            logger.debug("Per-reviewer cache hit for %s: %s", reviewer_name, activity_item.message_id)
+            continue
+
+        # Build and send reviewer prompt
+        label = f"{reviewer_name} (author)" if is_author else reviewer_name
+        rv_prompt = _build_reviewer_prompt(
+            patch_context_text, label, reviewer_msgs, activity_item.subject
+        )
+
+        logger.info(
+            "Per-reviewer: calling %s for reviewer '%s' (%d chars prompt, %d msgs)",
+            backend_label, reviewer_name, len(rv_prompt), len(reviewer_msgs),
+        )
+
+        try:
+            raw = backend.complete(rv_prompt, max_tokens=1024)
+            parsed = _parse_reviewer_response(raw, label)
+
+            if dump_dir:
+                _dump_llm_response(
+                    dump_dir, f"{activity_item.message_id}_reviewer_{email}",
+                    backend_label, raw, rv_prompt, is_error=(parsed is None),
+                )
+
+            if parsed is not None:
+                reviewer_results.append(parsed)
+                if cache:
+                    cache.put(rv_cache_key, parsed)
+                logger.info(
+                    "Per-reviewer LLM OK: %s -> %s (%s)",
+                    reviewer_name, parsed["sentiment"], activity_item.message_id,
+                )
+            else:
+                logger.warning(
+                    "Per-reviewer LLM parse failed for %s — falling back to heuristic",
+                    reviewer_name,
+                )
+                heuristic_rc = _heuristic_fallback_for_reviewer(
+                    reviewer_name, reviewer_msgs, is_author
+                )
+                if heuristic_rc:
+                    reviewer_results.append(heuristic_rc)
+
+        except Exception as e:
+            logger.warning(
+                "Per-reviewer LLM call failed for %s: %s — falling back to heuristic",
+                reviewer_name, e,
+            )
+            heuristic_rc = _heuristic_fallback_for_reviewer(
+                reviewer_name, reviewer_msgs, is_author
+            )
+            if heuristic_rc:
+                reviewer_results.append(heuristic_rc)
+
+    # --- Step 3: Assemble Overall Summary ---
+    overall_sentiment, overall_signals = _derive_overall_sentiment(reviewer_results)
+
+    # Use heuristic for discussion progress (reliable, no LLM needed)
+    progress, progress_detail = _determine_discussion_progress(
+        messages, activity_item.subject
+    )
+
+    # Build ReviewComment objects from results
+    review_comments: List[ReviewComment] = []
+    for rc_data in reviewer_results:
+        review_comments.append(ReviewComment(
+            author=rc_data.get("author", "Unknown"),
+            summary=rc_data.get("summary", ""),
+            sentiment=_map_sentiment(rc_data.get("sentiment", "NEUTRAL")),
+            sentiment_signals=rc_data.get("sentiment_signals", []),
+            has_inline_review=bool(rc_data.get("has_inline_review", False)),
+            tags_given=rc_data.get("tags_given", []),
+            analysis_source=rc_data.get("analysis_source", "heuristic"),
+        ))
+
+    logger.info(
+        "Per-reviewer analysis complete for %s: %d reviewers (%d LLM, %d heuristic), sentiment=%s",
+        activity_item.message_id,
+        len(review_comments),
+        sum(1 for rc in review_comments if rc.analysis_source == "llm"),
+        sum(1 for rc in review_comments if rc.analysis_source == "heuristic"),
+        overall_sentiment,
+    )
+
+    return ConversationSummary(
+        participant_count=participant_count,
+        key_points=[],
+        sentiment=_map_sentiment(overall_sentiment),
+        sentiment_signals=overall_signals,
+        patch_summary=patch_summary,
+        discussion_progress=progress,
+        progress_detail=progress_detail,
+        review_comments=review_comments,
+        analysis_source="llm-per-reviewer",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
+def _dump_llm_response(
+    dump_dir: Path,
+    message_id: str,
+    backend_label: str,
+    raw_response: str,
+    prompt: str,
+    is_error: bool = False,
+) -> Path:
+    """Write the raw LLM response (and optionally the prompt) to a dump file.
+
+    Files are named: <message_id_safe>_<backend>_<timestamp>[_ERROR].json
+    Returns the path of the written file.
+    """
+    from datetime import datetime as _dt
+
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    safe_id = re.sub(r"[^\w.-]", "_", message_id)[:80]
+    safe_backend = re.sub(r"[^\w.-]", "_", backend_label)
+    ts = _dt.now().strftime("%Y%m%d_%H%M%S")
+    suffix = "_ERROR" if is_error else ""
+    filename = f"{safe_id}_{safe_backend}_{ts}{suffix}.json"
+    dump_path = dump_dir / filename
+
+    dump_data = {
+        "message_id": message_id,
+        "backend": backend_label,
+        "timestamp": _dt.now().isoformat(),
+        "is_error": is_error,
+        "raw_response": raw_response,
+        "raw_response_length": len(raw_response),
+        "prompt_length": len(prompt),
+        "prompt": prompt,
+    }
+    dump_path.write_text(
+        json.dumps(dump_data, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return dump_path
+
 
 def analyze_thread_llm(
     thread_messages: List[Dict],
     activity_item: ActivityItem,
     backend: LLMBackend,
     cache: Optional[LLMCache] = None,
+    dump_dir: Optional[Path] = None,
+    force_monolithic: bool = False,
 ) -> ConversationSummary:
     """Analyze a thread using an LLM backend with heuristic fallback.
 
@@ -724,13 +1382,19 @@ def analyze_thread_llm(
         activity_item: The activity item this thread relates to.
         backend: The LLM backend to use (Ollama or Anthropic).
         cache: Optional disk cache for LLM results.
+        dump_dir: If set, dump every raw LLM response to this directory.
+            Parse failures are always dumped with an _ERROR suffix.
+        force_monolithic: If True, skip per-reviewer decomposition and use
+            the monolithic prompt even for Ollama on large threads.
 
     Returns:
         ConversationSummary with all analysis fields populated.
     """
     # Empty threads fall through to heuristic immediately
     if not thread_messages:
-        return analyze_thread(thread_messages, activity_item)
+        summary = analyze_thread(thread_messages, activity_item)
+        summary.analysis_source = "heuristic"
+        return summary
 
     # Check cache first — key includes backend+model so different LLMs
     # don't share cached results.
@@ -742,25 +1406,112 @@ def analyze_thread_llm(
             participant_count = _count_participants_simple(thread_messages)
             return _build_conversation_summary(cached, participant_count)
 
-    # Build prompt — use smaller context window for local models to avoid
-    # timeouts.  Ollama models typically have 8K-128K context but generate
-    # slowly on large inputs; Anthropic handles 200K easily.
+    # --- Per-reviewer decomposition for Ollama on large threads ---
+    if _should_use_per_reviewer_mode(backend, thread_messages, force_monolithic):
+        logger.info(
+            "Using per-reviewer decomposition for %s (%d messages, %s)",
+            activity_item.message_id, len(thread_messages),
+            f"{type(backend).__name__}({backend.model})",
+        )
+        try:
+            summary = _analyze_per_reviewer(
+                thread_messages, activity_item, backend, cache, dump_dir,
+            )
+            # Cache the assembled result under the main cache key too
+            if cache and summary.analysis_source == "llm-per-reviewer":
+                assembled = {
+                    "patch_summary": summary.patch_summary,
+                    "overall_sentiment": summary.sentiment.value.upper(),
+                    "overall_sentiment_signals": summary.sentiment_signals,
+                    "discussion_progress": (
+                        summary.discussion_progress.value.upper()
+                        if summary.discussion_progress else ""
+                    ),
+                    "progress_detail": summary.progress_detail,
+                    "review_comments": [
+                        {
+                            "author": rc.author,
+                            "summary": rc.summary,
+                            "sentiment": rc.sentiment.value.upper(),
+                            "sentiment_signals": rc.sentiment_signals,
+                            "has_inline_review": rc.has_inline_review,
+                            "tags_given": rc.tags_given,
+                        }
+                        for rc in summary.review_comments
+                    ],
+                }
+                cache.put(cache_key, assembled)
+            return summary
+        except Exception as e:
+            logger.error(
+                "Per-reviewer analysis failed for %s: %s — trying monolithic fallback",
+                activity_item.message_id, e,
+            )
+            # Fall through to the existing monolithic approach below
+
     is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
-    max_thread_chars = 12000 if isinstance(backend, OllamaBackend) else 30000
-    thread_text = _build_thread_text(thread_messages, max_chars=max_thread_chars)
-    prompt = _build_analysis_prompt(thread_text, activity_item.subject, is_patch)
+    backend_label = f"{type(backend).__name__}({backend.model})"
+
+    # Try with progressively smaller context on failure.
+    # Large threads overwhelm small models, causing schema violations.
+    context_sizes = [30000, 15000, 8000]
+
+    parsed = None
+    raw_response = ""
+    prompt = ""
 
     try:
-        logger.debug("Calling LLM for %s (%d chars prompt)", activity_item.message_id, len(prompt))
-        raw_response = backend.complete(prompt)
-        parsed = _parse_llm_response(raw_response)
+        for attempt, max_thread_chars in enumerate(context_sizes):
+            thread_text = _build_thread_text(thread_messages, max_chars=max_thread_chars)
+            prompt = _build_analysis_prompt(thread_text, activity_item.subject, is_patch)
 
-        if parsed is None:
-            logger.warning(
-                "LLM returned unparseable response for %s, falling back to heuristic",
-                activity_item.message_id,
+            logger.info(
+                "Calling %s for %s (attempt %d/%d, %d chars prompt, %d char context)",
+                backend_label, activity_item.message_id,
+                attempt + 1, len(context_sizes), len(prompt), max_thread_chars,
             )
-            return analyze_thread(thread_messages, activity_item)
+            raw_response = backend.complete(prompt)
+            logger.info(
+                "%s responded with %d chars for %s",
+                backend_label, len(raw_response), activity_item.message_id,
+            )
+            parsed = _parse_llm_response(raw_response)
+
+            if parsed is not None:
+                break  # Success
+
+            # Dump failed attempt
+            error_dump_dir = dump_dir or Path("logs/llm_dumps")
+            dump_path = _dump_llm_response(
+                error_dump_dir, activity_item.message_id,
+                backend_label, raw_response, prompt, is_error=True,
+            )
+
+            if attempt < len(context_sizes) - 1:
+                next_size = context_sizes[attempt + 1]
+                logger.warning(
+                    "LLM response failed validation for %s (attempt %d/%d, context=%d). "
+                    "Retrying with smaller context (%d chars). Dump: %s",
+                    activity_item.message_id, attempt + 1, len(context_sizes),
+                    max_thread_chars, next_size, dump_path,
+                )
+            else:
+                logger.warning(
+                    "LLM returned unparseable response for %s after %d attempts — "
+                    "FALLING BACK TO HEURISTIC. Dump: %s",
+                    activity_item.message_id, len(context_sizes), dump_path,
+                )
+                summary = analyze_thread(thread_messages, activity_item)
+                summary.analysis_source = "llm-fallback-heuristic"
+                return summary
+
+        # Dump successful response if dump_dir is explicitly set
+        if dump_dir:
+            dump_path = _dump_llm_response(
+                dump_dir, activity_item.message_id,
+                backend_label, raw_response, prompt, is_error=False,
+            )
+            logger.debug("LLM response dumped to: %s", dump_path)
 
         # Cache the parsed result
         if cache:
@@ -768,7 +1519,7 @@ def analyze_thread_llm(
 
         participant_count = _count_participants_simple(thread_messages)
         summary = _build_conversation_summary(parsed, participant_count)
-        logger.debug(
+        logger.info(
             "LLM analysis complete for %s: sentiment=%s, progress=%s, %d reviews",
             activity_item.message_id,
             summary.sentiment.value,
@@ -778,9 +1529,10 @@ def analyze_thread_llm(
         return summary
 
     except Exception as e:
-        logger.warning(
-            "LLM call failed for %s: %s — falling back to heuristic",
-            activity_item.message_id,
-            e,
+        logger.error(
+            "%s call FAILED for %s: %s — FALLING BACK TO HEURISTIC",
+            backend_label, activity_item.message_id, e,
         )
-        return analyze_thread(thread_messages, activity_item)
+        summary = analyze_thread(thread_messages, activity_item)
+        summary.analysis_source = "llm-fallback-heuristic"
+        return summary

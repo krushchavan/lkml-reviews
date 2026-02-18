@@ -51,6 +51,7 @@ class ReviewComment:
     sentiment_signals: list[str] = field(default_factory=list)
     has_inline_review: bool = False     # True if they did inline code review
     tags_given: list[str] = field(default_factory=list)  # e.g. ["Reviewed-by", "Tested-by"]
+    analysis_source: str = "heuristic"  # "heuristic" or "llm"
 
 
 @dataclass
@@ -63,6 +64,7 @@ class ConversationSummary:
     discussion_progress: Optional['DiscussionProgress'] = None  # Where things stand
     progress_detail: str = ""           # Human-readable progress sentence
     review_comments: list[ReviewComment] = field(default_factory=list)  # Per-reviewer breakdowns
+    analysis_source: str = "heuristic"  # "heuristic", "llm", or "llm-fallback-heuristic"
 
 
 @dataclass
