@@ -507,7 +507,7 @@ def generate_single_report(
             daily_report.llm_backends.append((backend_name, backend.model))
 
         for i, dev in enumerate(developers, 1):
-            logger.info("[%d/%d] Processing %s...", i, len(developers), dev.name)
+            logger.info("[%d/%d] Processing %s for %s...", i, len(developers), dev.name, date_display)
             try:
                 llm_dump_dir = Path(args.llm_dump) if args.llm_dump else None
                 dev_report = process_developer(

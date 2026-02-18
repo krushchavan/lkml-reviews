@@ -926,6 +926,95 @@ def _parse_patch_summary_response(raw: str) -> Optional[str]:
     return None
 
 
+def _summarize_patch_series_chunked(
+    messages: List[Dict],
+    activity_item: ActivityItem,
+    backend: "LLMBackend",
+    cache: Optional[LLMCache] = None,
+    dump_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """Summarize a multi-message patch series by calling the LLM per-message.
+
+    For a series with a cover letter + N patches, each message gets its own
+    small LLM call (~3K prompt, max_tokens=512).  The individual summaries
+    are combined into one overall patch summary.
+
+    Returns the combined summary string, or None if all calls failed.
+    """
+    backend_label = f"{type(backend).__name__}({backend.model})"
+    summaries: List[str] = []
+
+    for i, msg in enumerate(messages):
+        suffix = f"patch_msg_{i}"
+        msg_cache_key = _compute_per_reviewer_cache_key(
+            activity_item.message_id, messages, backend, suffix,
+        )
+        cached = cache.get(msg_cache_key) if cache else None
+
+        if cached is not None:
+            s = cached.get("patch_summary", "")
+            if s:
+                summaries.append(s)
+            continue
+
+        # Build a small prompt from this single message
+        msg_text = _build_thread_text([msg], max_chars=3000)
+        subject = msg.get("subject", activity_item.subject)
+        prompt = _build_patch_summary_prompt(msg_text, subject)
+
+        logger.info(
+            "Patch series chunk %d/%d for %s — calling %s (%d chars)",
+            i + 1, len(messages), activity_item.message_id,
+            backend_label, len(prompt),
+        )
+
+        try:
+            raw = backend.complete(prompt, max_tokens=512)
+            parsed_summary = _parse_patch_summary_response(raw)
+
+            if dump_dir:
+                _dump_llm_response(
+                    dump_dir,
+                    f"{activity_item.message_id}_patch_msg_{i}",
+                    backend_label, raw, prompt,
+                    is_error=(parsed_summary is None),
+                )
+
+            if parsed_summary:
+                summaries.append(parsed_summary)
+                if cache:
+                    cache.put(msg_cache_key, {"patch_summary": parsed_summary})
+            else:
+                logger.warning(
+                    "Patch series chunk %d/%d parse failed for %s",
+                    i + 1, len(messages), activity_item.message_id,
+                )
+        except Exception as e:
+            logger.warning(
+                "Patch series chunk %d/%d LLM call failed for %s: %s",
+                i + 1, len(messages), activity_item.message_id, e,
+            )
+
+    if not summaries:
+        return None
+
+    # For a single message (or single success), just return it directly
+    if len(summaries) == 1:
+        return summaries[0]
+
+    # Combine: first summary is the series overview, rest are per-patch details
+    combined = summaries[0]
+    if len(summaries) > 1:
+        patch_details = " ".join(summaries[1:])
+        combined = f"{combined} Individual patches: {patch_details}"
+
+    # Trim if overly long
+    if len(combined) > 2000:
+        combined = combined[:2000].rsplit(" ", 1)[0] + "..."
+
+    return combined
+
+
 def _build_reviewer_prompt(
     patch_context: str,
     reviewer_name: str,
@@ -1394,6 +1483,42 @@ def analyze_thread_llm(
     if not thread_messages:
         summary = analyze_thread(thread_messages, activity_item)
         summary.analysis_source = "heuristic"
+        return summary
+
+    # Single-participant threads (e.g. patch series with no replies): use
+    # the LLM only for patch summaries (small, chunked calls) and heuristic
+    # for everything else (sentiment, progress, review comments).  No point
+    # sending the full monolithic prompt when there's no discussion to analyze.
+    participant_count = _count_participants_simple(thread_messages)
+    if participant_count <= 1:
+        is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
+        summary = analyze_thread(thread_messages, activity_item)
+
+        if is_patch:
+            # Summarize each message in the series with its own small LLM call
+            logger.info(
+                "Single-participant patch %s (%d msgs) — chunked patch summary",
+                activity_item.message_id, len(thread_messages),
+            )
+            llm_summary = _summarize_patch_series_chunked(
+                thread_messages, activity_item, backend, cache, dump_dir,
+            )
+            if llm_summary:
+                summary.patch_summary = llm_summary
+                summary.analysis_source = "llm"
+            else:
+                summary.analysis_source = "llm-fallback-heuristic"
+                logger.warning(
+                    "All chunked patch summary calls failed for %s — keeping heuristic",
+                    activity_item.message_id,
+                )
+        else:
+            summary.analysis_source = "heuristic"
+            logger.info(
+                "Single-participant non-patch %s — using heuristic only",
+                activity_item.message_id,
+            )
+
         return summary
 
     # Check cache first — key includes backend+model so different LLMs
