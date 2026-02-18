@@ -1452,58 +1452,46 @@ def analyze_thread_llm(
     is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
     backend_label = f"{type(backend).__name__}({backend.model})"
 
-    # Try with progressively smaller context on failure.
-    # Large threads overwhelm small models, causing schema violations.
-    context_sizes = [30000, 15000, 8000]
-
-    parsed = None
-    raw_response = ""
-    prompt = ""
+    # Use a single context size appropriate for the backend.
+    # Anthropic handles large contexts well; Ollama on CPU benefits from
+    # smaller prompts for better output quality (per-reviewer mode handles
+    # the normal case — this monolithic path is either Anthropic or forced).
+    if isinstance(backend, OllamaBackend):
+        max_thread_chars = 10000  # keep small for quality on local models
+    else:
+        max_thread_chars = 30000  # Anthropic/cloud handles large prompts fine
 
     try:
-        for attempt, max_thread_chars in enumerate(context_sizes):
-            thread_text = _build_thread_text(thread_messages, max_chars=max_thread_chars)
-            prompt = _build_analysis_prompt(thread_text, activity_item.subject, is_patch)
+        thread_text = _build_thread_text(thread_messages, max_chars=max_thread_chars)
+        prompt = _build_analysis_prompt(thread_text, activity_item.subject, is_patch)
 
-            logger.info(
-                "Calling %s for %s (attempt %d/%d, %d chars prompt, %d char context)",
-                backend_label, activity_item.message_id,
-                attempt + 1, len(context_sizes), len(prompt), max_thread_chars,
-            )
-            raw_response = backend.complete(prompt)
-            logger.info(
-                "%s responded with %d chars for %s",
-                backend_label, len(raw_response), activity_item.message_id,
-            )
-            parsed = _parse_llm_response(raw_response)
+        logger.info(
+            "Calling %s for %s (monolithic, %d chars prompt, %d char context)",
+            backend_label, activity_item.message_id,
+            len(prompt), max_thread_chars,
+        )
+        raw_response = backend.complete(prompt)
+        logger.info(
+            "%s responded with %d chars for %s",
+            backend_label, len(raw_response), activity_item.message_id,
+        )
+        parsed = _parse_llm_response(raw_response)
 
-            if parsed is not None:
-                break  # Success
-
-            # Dump failed attempt
+        if parsed is None:
+            # Dump the failed response
             error_dump_dir = dump_dir or Path("logs/llm_dumps")
             dump_path = _dump_llm_response(
                 error_dump_dir, activity_item.message_id,
                 backend_label, raw_response, prompt, is_error=True,
             )
-
-            if attempt < len(context_sizes) - 1:
-                next_size = context_sizes[attempt + 1]
-                logger.warning(
-                    "LLM response failed validation for %s (attempt %d/%d, context=%d). "
-                    "Retrying with smaller context (%d chars). Dump: %s",
-                    activity_item.message_id, attempt + 1, len(context_sizes),
-                    max_thread_chars, next_size, dump_path,
-                )
-            else:
-                logger.warning(
-                    "LLM returned unparseable response for %s after %d attempts — "
-                    "FALLING BACK TO HEURISTIC. Dump: %s",
-                    activity_item.message_id, len(context_sizes), dump_path,
-                )
-                summary = analyze_thread(thread_messages, activity_item)
-                summary.analysis_source = "llm-fallback-heuristic"
-                return summary
+            logger.warning(
+                "LLM returned unparseable response for %s — "
+                "FALLING BACK TO HEURISTIC. Dump: %s",
+                activity_item.message_id, dump_path,
+            )
+            summary = analyze_thread(thread_messages, activity_item)
+            summary.analysis_source = "llm-fallback-heuristic"
+            return summary
 
         # Dump successful response if dump_dir is explicitly set
         if dump_dir:

@@ -478,7 +478,7 @@ def generate_single_report(
 
     file_handler = logging.FileHandler(log_path, encoding="utf-8")
     file_handler.setFormatter(
-        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
+        logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S %Z")
     )
     file_handler.setLevel(logging.DEBUG)
     root_logger = logging.getLogger()
@@ -762,7 +762,7 @@ def main():
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
+        datefmt="%H:%M:%S %Z",
     )
 
     # --- Purge-only mode ---

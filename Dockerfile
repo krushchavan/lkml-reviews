@@ -3,10 +3,13 @@ FROM python:3.12-slim
 LABEL maintainer="krush"
 LABEL description="LKML Daily Activity Tracker - generates HTML reports of Linux kernel developer activity"
 
-# Install cron (needed for scheduled mode) and clean up apt cache
+# Install cron + timezone data and clean up apt cache
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends cron && \
+    apt-get install -y --no-install-recommends cron tzdata && \
     rm -rf /var/lib/apt/lists/*
+
+# Default timezone (overridden by TZ env var in docker-compose)
+ENV TZ=America/New_York
 
 WORKDIR /app
 

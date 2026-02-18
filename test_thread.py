@@ -233,7 +233,7 @@ def main():
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
+        datefmt="%H:%M:%S %Z",
     )
 
     msg_id = args.message_id.strip("<>")

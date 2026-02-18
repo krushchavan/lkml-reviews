@@ -21,6 +21,8 @@ services:
       - RUN_ON_STARTUP=${RUN_ON_STARTUP:-false}
       # Auto-purge reports/logs older than this many days (default: 30)
       - RETENTION_DAYS=${RETENTION_DAYS:-30}
+      # Timezone for log timestamps (run `timedatectl` or check /etc/timezone on host)
+      - TZ=${TZ:-America/New_York}
       # Linux: set to your user/group ID so files are owned by you (run `id` to check)
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
