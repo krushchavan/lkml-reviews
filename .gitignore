@@ -6,3 +6,4 @@ logs/
 dumps/
 .claude/
 kernel_developers_emails_1.csv
+.env
