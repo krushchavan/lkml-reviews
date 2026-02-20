@@ -38,6 +38,11 @@ from thread_analyzer import (
 
 logger = logging.getLogger(__name__)
 
+# Increment when prompt templates, _sentence_range(), or _scale_max_tokens() change.
+# This is included in cache keys so that stale cached responses (generated with
+# different prompt instructions) are automatically invalidated.
+_PROMPT_VERSION = "v1"
+
 
 # ---------------------------------------------------------------------------
 # Backend abstraction
@@ -316,6 +321,50 @@ def _build_thread_text(messages: List[Dict], max_chars: int = 30000) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Proportional sizing helpers
+# ---------------------------------------------------------------------------
+
+def _sentence_range(input_chars: int, summary_type: str) -> str:
+    """Return a sentence-count instruction proportional to input size.
+
+    Args:
+        input_chars: Length of the input text being summarized.
+        summary_type: "patch" or "reviewer".
+    """
+    if summary_type == "patch":
+        if input_chars < 1000:
+            return "1-2 sentence"
+        elif input_chars < 2000:
+            return "2-3 sentence"
+        elif input_chars < 4000:
+            return "3-5 sentence"
+        else:
+            return "4-6 sentence"
+    else:  # reviewer
+        if input_chars < 500:
+            return "1-2 sentence"
+        elif input_chars < 2000:
+            return "2-3 sentence"
+        elif input_chars < 4000:
+            return "3-4 sentence"
+        else:
+            return "4-5 sentence"
+
+
+def _scale_max_tokens(prompt_len: int, summary_type: str) -> int:
+    """Return max_tokens proportional to prompt size.
+
+    Args:
+        prompt_len: Character length of the full prompt.
+        summary_type: "patch_summary" or "reviewer".
+    """
+    if summary_type == "patch_summary":
+        return max(256, min(1024, prompt_len // 4))
+    else:  # reviewer
+        return max(512, min(2048, prompt_len // 3))
+
+
+# ---------------------------------------------------------------------------
 # Prompt construction
 # ---------------------------------------------------------------------------
 
@@ -334,9 +383,12 @@ def _build_analysis_prompt(
 
     patch_instruction = ""
     if is_patch:
-        patch_instruction = """
-- "patch_summary": A 2-4 sentence summary of what the patch/series does technically.
+        patch_sr = _sentence_range(len(thread_text), "patch")
+        patch_instruction = f"""
+- "patch_summary": A {patch_sr} summary of what the patch/series does technically.
   Focus on the problem it solves and the approach taken. Do NOT just repeat the subject line."""
+
+    reviewer_sr = _sentence_range(len(thread_text), "reviewer")
 
     return f"""You are a senior Linux kernel developer analyzing an LKML email thread.
 Your job is to produce a concise analytical summary — NOT to quote or copy text from the emails.
@@ -354,7 +406,8 @@ Return a JSON object with exactly these fields:
   "review_comments": [
     {{
       "author": "First Last",
-      "summary": "your own 2-3 sentence analytical summary",
+      "reply_to": "Name of the person this message replies to, or empty string if replying to the patch author / root message",
+      "summary": "your own {reviewer_sr} analytical summary",
       "sentiment": "one of: {sentiment_values}",
       "sentiment_signals": ["signal1"],
       "has_inline_review": true,
@@ -375,10 +428,16 @@ Field rules:
   WAITING_FOR_REVIEW = no substantive replies yet.
   SUPERSEDED = replaced by a newer version.
   RFC = Request For Comments, not yet intended for merge.
-- "review_comments": One entry per reviewer (NOT the patch author, unless they posted
-  substantive follow-up). Set has_inline_review=true if they quoted code and commented inline.
+- "review_comments": One entry per RESPONSE MESSAGE (not per reviewer). If a reviewer sends
+  three separate messages in the thread, produce three entries for them, each with its own
+  summary, sentiment, and reply_to. Do NOT merge multiple messages from the same author into one.
+  Exclude the original patch author's root message. Include the patch author only if they post
+  a substantive follow-up reply. Set has_inline_review=true if they quoted code and commented inline.
+- "reply_to": The short name of the person this message is directly replying to. Use an empty
+  string if the message replies to the patch root / original author. This is used to reconstruct
+  the thread tree structure. Examples: "David Hildenbrand", "Zi Yan", "".
 - "tags_given": Only formal kernel tags (Reviewed-by, Acked-by, Tested-by) that the
-  reviewer explicitly gave.
+  reviewer explicitly gave in that specific message.
 - Empty thread (no replies): empty review_comments, WAITING_FOR_REVIEW, NEUTRAL.
 - Non-patch thread: use empty string for patch_summary.
 
@@ -660,6 +719,7 @@ def _normalize_llm_output(parsed: Dict) -> Dict:
                 or rc.get("reviewer")
                 or rc.get("name", "Unknown")
             ),
+            "reply_to": str(rc.get("reply_to") or "").strip(),
             "summary": _clean_summary_text(str(
                 rc.get("summary")
                 or rc.get("comment")
@@ -719,18 +779,39 @@ def _map_progress(value: str) -> Optional[DiscussionProgress]:
 def _build_conversation_summary(
     parsed: Dict,
     participant_count: int,
+    thread_messages: Optional[List[Dict]] = None,
 ) -> ConversationSummary:
     """Convert parsed LLM JSON into a ConversationSummary."""
+    # Build author→raw_body lookup from thread messages for raw text inclusion
+    author_bodies: Dict[str, List[str]] = {}
+    if thread_messages:
+        for msg in thread_messages[1:]:  # skip root
+            from_field = msg.get("from", "")
+            short_name = _extract_author_short(from_field)
+            body = msg.get("body", "")
+            if body.strip():
+                author_bodies.setdefault(short_name.lower(), []).append(body)
+
     review_comments = []
     for rc_data in parsed.get("review_comments", []):
+        author = rc_data.get("author", "Unknown")
+        # Prefer cached raw_body (from per-reviewer cache); fall back to
+        # reconstructing from thread messages (monolithic cache or first run).
+        raw_body = rc_data.get("raw_body", "")
+        if not raw_body:
+            raw_bodies = author_bodies.get(author.lower(), [])
+            raw_body = "\n\n---\n\n".join(raw_bodies) if raw_bodies else ""
+
         review_comments.append(ReviewComment(
-            author=rc_data.get("author", "Unknown"),
+            author=author,
             summary=rc_data.get("summary", ""),
             sentiment=_map_sentiment(rc_data.get("sentiment", "NEUTRAL")),
             sentiment_signals=rc_data.get("sentiment_signals", []),
             has_inline_review=bool(rc_data.get("has_inline_review", False)),
             tags_given=rc_data.get("tags_given", []),
             analysis_source="llm",
+            raw_body=raw_body,
+            reply_to=rc_data.get("reply_to", ""),
         ))
 
     overall_sentiment = _map_sentiment(
@@ -781,7 +862,7 @@ def _compute_cache_key(
     else:
         backend_tag = "unknown"
 
-    content_parts = [message_id, backend_tag, str(len(messages))]
+    content_parts = [message_id, backend_tag, _PROMPT_VERSION, str(len(messages))]
     for msg in messages:
         content_parts.append(msg.get("message_id", ""))
     content_str = "|".join(content_parts)
@@ -848,30 +929,64 @@ def _should_use_per_reviewer_mode(
 def _group_messages_by_reviewer(
     messages: List[Dict],
 ) -> Dict[str, Dict]:
-    """Group thread messages by reviewer email.
+    """Group thread messages by reviewer email, split by reply-to context.
 
-    Returns dict mapping reviewer_email -> {
+    When a reviewer replies to multiple different people, their messages are
+    split into separate groups — one per distinct reply-to author.  This
+    produces a tree-like view (e.g. "Zi Yan replying to David" vs "Zi Yan
+    replying to Johannes") rather than one merged blob.
+
+    Returns dict mapping "<email>|<reply_to_email>" -> {
         "name": "First Last",
         "email": "user@domain.com",
         "messages": [msg_dict, ...],
         "is_author": bool,
+        "reply_to_name": "David Hildenbrand",  # short name, "" if unknown
     }
     """
     root_email = _extract_email(messages[0].get("from", ""))
+
+    # Build a message-id -> (email, short_name) lookup for reply-to resolution
+    msgid_to_author: Dict[str, tuple] = {}
+    for msg in messages:
+        mid = msg.get("message_id", "").strip("<>")
+        from_field = msg.get("from", "")
+        if mid:
+            msgid_to_author[mid] = (
+                _extract_email(from_field),
+                _extract_author_short(from_field),
+            )
 
     groups: Dict[str, Dict] = {}
     for msg in messages[1:]:  # Skip root message
         from_field = msg.get("from", "")
         email = _extract_email(from_field)
+        name = _extract_author_short(from_field)
 
-        if email not in groups:
-            groups[email] = {
-                "name": _extract_author_short(from_field),
+        # Resolve who this message is replying to
+        irt = msg.get("in_reply_to", "").strip("<>")
+        reply_to_email = ""
+        reply_to_name = ""
+        if irt and irt in msgid_to_author:
+            reply_to_email, reply_to_name = msgid_to_author[irt]
+            # Don't label the reply-to as the reviewer replying to themselves
+            if reply_to_email == email:
+                reply_to_email = ""
+                reply_to_name = ""
+
+        # Key: email + reply_to_email (so each distinct conversation branch
+        # gets its own group)
+        group_key = f"{email}|{reply_to_email}"
+
+        if group_key not in groups:
+            groups[group_key] = {
+                "name": name,
                 "email": email,
                 "messages": [],
                 "is_author": (email == root_email),
+                "reply_to_name": reply_to_name,
             }
-        groups[email]["messages"].append(msg)
+        groups[group_key]["messages"].append(msg)
 
     return groups
 
@@ -885,13 +1000,14 @@ def _build_patch_context_text(messages: List[Dict], max_chars: int = 3000) -> st
 
 def _build_patch_summary_prompt(patch_text: str, subject: str) -> str:
     """Build a focused prompt for summarizing the patch description only."""
+    sr = _sentence_range(len(patch_text), "patch")
     return f"""You are a senior Linux kernel developer. Summarize what this patch does.
 
 Thread subject: {subject}
 
 Return a JSON object with exactly one field:
 {{
-  "patch_summary": "2-4 sentence technical summary of what the patch does, the problem it solves, and the approach taken."
+  "patch_summary": "{sr} technical summary of what the patch does, the problem it solves, and the approach taken."
 }}
 
 IMPORTANT:
@@ -969,7 +1085,8 @@ def _summarize_patch_series_chunked(
         )
 
         try:
-            raw = backend.complete(prompt, max_tokens=512)
+            tokens = _scale_max_tokens(len(prompt), "patch_summary")
+            raw = backend.complete(prompt, max_tokens=tokens)
             parsed_summary = _parse_patch_summary_response(raw)
 
             if dump_dir:
@@ -1008,9 +1125,10 @@ def _summarize_patch_series_chunked(
         patch_details = " ".join(summaries[1:])
         combined = f"{combined} Individual patches: {patch_details}"
 
-    # Trim if overly long
-    if len(combined) > 2000:
-        combined = combined[:2000].rsplit(" ", 1)[0] + "..."
+    # Trim scales with number of patches — more patches = longer combined summary
+    max_combined = 1000 + (len(summaries) * 500)
+    if len(combined) > max_combined:
+        combined = combined[:max_combined].rsplit(" ", 1)[0] + "..."
 
     return combined
 
@@ -1020,23 +1138,29 @@ def _build_reviewer_prompt(
     reviewer_name: str,
     reviewer_messages: List[Dict],
     subject: str,
+    reply_to_name: str = "",
 ) -> str:
     """Build a focused prompt for analyzing a single reviewer's contribution."""
     sentiment_values = "POSITIVE, NEEDS_WORK, CONTENTIOUS, NEUTRAL"
 
     # Build text for this reviewer's messages only
     reviewer_text = _build_thread_text(reviewer_messages, max_chars=5000)
+    sr = _sentence_range(len(reviewer_text), "reviewer")
+
+    reply_context = ""
+    if reply_to_name:
+        reply_context = f"\nThis reviewer is replying to: {reply_to_name}\n"
 
     return f"""You are a senior Linux kernel developer analyzing ONE reviewer's comments on a patch.
 
 Thread subject: {subject}
-Reviewer: {reviewer_name}
+Reviewer: {reviewer_name}{reply_context}
 
 The original patch description is provided for context, followed by this reviewer's messages.
 
 Return a JSON object with exactly these fields:
 {{
-  "summary": "2-3 sentence analytical summary of what this reviewer raised",
+  "summary": "{sr} analytical summary of what this reviewer raised",
   "sentiment": "one of: {sentiment_values}",
   "sentiment_signals": ["signal1", "signal2"],
   "has_inline_review": true,
@@ -1151,6 +1275,7 @@ def _heuristic_fallback_for_reviewer(
     reviewer_name: str,
     reviewer_msgs: List[Dict],
     is_author: bool,
+    reply_to_name: str = "",
 ) -> Optional[Dict]:
     """Build a heuristic ReviewComment dict for a single reviewer (fallback)."""
     all_bodies: List[str] = []
@@ -1170,18 +1295,23 @@ def _heuristic_fallback_for_reviewer(
     if not all_bodies and not all_tags:
         return None
 
-    # Build summary
+    # Preserve raw body text
+    raw_body = "\n\n---\n\n".join(all_bodies)
+
+    # Build summary — budget scales with input size
+    total_body_chars = sum(len(b) for b in all_bodies)
     comment_parts: List[str] = []
     for i, body in enumerate(all_bodies):
-        budget = 400 if i == 0 else 250
+        budget = max(200, min(800, len(body) // 3))
         extracted = _extract_comment_body(body, max_chars=budget)
         if extracted:
             comment_parts.append(extracted)
 
     if comment_parts:
+        combined_cap = max(300, min(2000, total_body_chars // 3))
         combined = " ".join(comment_parts)
-        if len(combined) > 500:
-            combined = combined[:500].rsplit(" ", 1)[0] + "..."
+        if len(combined) > combined_cap:
+            combined = combined[:combined_cap].rsplit(" ", 1)[0] + "..."
         summary = combined
     elif all_tags:
         unique_tags = list(dict.fromkeys(all_tags))
@@ -1203,6 +1333,8 @@ def _heuristic_fallback_for_reviewer(
         "has_inline_review": has_inline,
         "tags_given": unique_tags,
         "analysis_source": "heuristic",
+        "raw_body": raw_body,
+        "reply_to": reply_to_name,
     }
 
 
@@ -1257,7 +1389,8 @@ def _analyze_per_reviewer(
                 backend_label, len(ps_prompt),
             )
             try:
-                raw = backend.complete(ps_prompt, max_tokens=512)
+                ps_tokens = _scale_max_tokens(len(ps_prompt), "patch_summary")
+                raw = backend.complete(ps_prompt, max_tokens=ps_tokens)
                 patch_summary = _parse_patch_summary_response(raw) or ""
 
                 if patch_summary and cache:
@@ -1279,10 +1412,15 @@ def _analyze_per_reviewer(
 
     reviewer_results: List[Dict] = []
 
-    for email, group_info in reviewer_groups.items():
+    for group_key, group_info in reviewer_groups.items():
         reviewer_name = group_info["name"]
         reviewer_msgs = group_info["messages"]
         is_author = group_info["is_author"]
+        reply_to_name = group_info.get("reply_to_name", "")
+        # Use email portion of the group key for cache/dump naming
+        email = group_info["email"]
+        # Make cache/dump suffix unique per (email, reply_to) combination
+        cache_suffix = group_key.replace("|", "_rt_")
 
         # Check for substantive messages
         has_substance = any(
@@ -1304,12 +1442,13 @@ def _analyze_per_reviewer(
                     "has_inline_review": False,
                     "tags_given": unique_tags,
                     "analysis_source": "heuristic",
+                    "reply_to": reply_to_name,
                 })
             continue
 
         # Check per-reviewer cache
         rv_cache_key = _compute_per_reviewer_cache_key(
-            activity_item.message_id, messages, backend, f"reviewer_{email}"
+            activity_item.message_id, messages, backend, f"reviewer_{cache_suffix}"
         )
         cached_rv = cache.get(rv_cache_key) if cache else None
 
@@ -1318,28 +1457,39 @@ def _analyze_per_reviewer(
             logger.debug("Per-reviewer cache hit for %s: %s", reviewer_name, activity_item.message_id)
             continue
 
+        # Collect raw body text (quote-stripped, no truncation)
+        reviewer_bodies = [m.get("body", "") for m in reviewer_msgs if m.get("body", "").strip()]
+        reviewer_raw_body = "\n\n---\n\n".join(reviewer_bodies)
+
         # Build and send reviewer prompt
         label = f"{reviewer_name} (author)" if is_author else reviewer_name
         rv_prompt = _build_reviewer_prompt(
-            patch_context_text, label, reviewer_msgs, activity_item.subject
+            patch_context_text, label, reviewer_msgs, activity_item.subject,
+            reply_to_name=reply_to_name,
         )
 
         logger.info(
-            "Per-reviewer: calling %s for reviewer '%s' (%d chars prompt, %d msgs)",
-            backend_label, reviewer_name, len(rv_prompt), len(reviewer_msgs),
+            "Per-reviewer: calling %s for reviewer '%s'%s (%d chars prompt, %d msgs)",
+            backend_label, reviewer_name,
+            f" (replying to {reply_to_name})" if reply_to_name else "",
+            len(rv_prompt), len(reviewer_msgs),
         )
 
         try:
-            raw = backend.complete(rv_prompt, max_tokens=1024)
+            rv_tokens = _scale_max_tokens(len(rv_prompt), "reviewer")
+            raw = backend.complete(rv_prompt, max_tokens=rv_tokens)
             parsed = _parse_reviewer_response(raw, label)
 
             if dump_dir:
+                safe_suffix = re.sub(r"[^\w.-]", "_", cache_suffix)[:60]
                 _dump_llm_response(
-                    dump_dir, f"{activity_item.message_id}_reviewer_{email}",
+                    dump_dir, f"{activity_item.message_id}_reviewer_{safe_suffix}",
                     backend_label, raw, rv_prompt, is_error=(parsed is None),
                 )
 
             if parsed is not None:
+                parsed["raw_body"] = reviewer_raw_body
+                parsed["reply_to"] = reply_to_name
                 reviewer_results.append(parsed)
                 if cache:
                     cache.put(rv_cache_key, parsed)
@@ -1353,7 +1503,7 @@ def _analyze_per_reviewer(
                     reviewer_name,
                 )
                 heuristic_rc = _heuristic_fallback_for_reviewer(
-                    reviewer_name, reviewer_msgs, is_author
+                    reviewer_name, reviewer_msgs, is_author, reply_to_name=reply_to_name
                 )
                 if heuristic_rc:
                     reviewer_results.append(heuristic_rc)
@@ -1364,7 +1514,7 @@ def _analyze_per_reviewer(
                 reviewer_name, e,
             )
             heuristic_rc = _heuristic_fallback_for_reviewer(
-                reviewer_name, reviewer_msgs, is_author
+                reviewer_name, reviewer_msgs, is_author, reply_to_name=reply_to_name
             )
             if heuristic_rc:
                 reviewer_results.append(heuristic_rc)
@@ -1388,6 +1538,8 @@ def _analyze_per_reviewer(
             has_inline_review=bool(rc_data.get("has_inline_review", False)),
             tags_given=rc_data.get("tags_given", []),
             analysis_source=rc_data.get("analysis_source", "heuristic"),
+            raw_body=rc_data.get("raw_body", ""),
+            reply_to=rc_data.get("reply_to", ""),
         ))
 
     logger.info(
@@ -1454,6 +1606,75 @@ def _dump_llm_response(
         encoding="utf-8",
     )
     return dump_path
+
+
+def _merge_monolithic_review_comments(
+    raw_comments: List[Dict],
+    thread_messages: List[Dict],
+) -> List[Dict]:
+    """Process per-message review comment entries from the monolithic LLM output.
+
+    The monolithic prompt asks the LLM to produce one entry per response
+    message with a ``reply_to`` field, mirroring the per-reviewer decomposition.
+    This function keeps each entry as its own distinct card — we do NOT combine
+    multiple messages from the same author into a single block.  Each message
+    retains its own individual LLM summary, sentiment, and reply_to, so the
+    thread tree can show the full conversation granularity.
+
+    The only post-processing done here is:
+    1. Attaching ``raw_body`` text from the thread messages, indexed by author
+       name in encounter order so the "Show original" expander works.
+    2. Ensuring all required fields are present with safe defaults.
+
+    Returns the list in the original encounter order (as the LLM produced it).
+    """
+    # Build author-name -> queue of raw message bodies (in thread order)
+    # so we can attach one body per LLM entry for each author.
+    author_body_queues: Dict[str, List[str]] = {}
+    if thread_messages:
+        for msg in thread_messages[1:]:  # skip root
+            short = _extract_author_short(msg.get("from", ""))
+            body = msg.get("body", "")
+            if body.strip():
+                author_body_queues.setdefault(short.lower(), []).append(body)
+
+    # Keep a per-author cursor so successive entries by the same author each
+    # get a different raw body message.
+    author_cursor: Dict[str, int] = {}
+
+    result: List[Dict] = []
+
+    for rc in raw_comments:
+        if not isinstance(rc, dict):
+            continue
+        author = str(rc.get("author") or "Unknown").strip()
+        reply_to = str(rc.get("reply_to") or "").strip()
+        summary = rc.get("summary", "")
+        sentiment = str(rc.get("sentiment") or "NEUTRAL").upper().strip()
+        signals = list(rc.get("sentiment_signals") or [])
+        inline = bool(rc.get("has_inline_review", False))
+        tags = list(rc.get("tags_given") or [])
+
+        # Attach the next available raw body for this author
+        author_key = author.lower()
+        bodies = author_body_queues.get(author_key, [])
+        cursor = author_cursor.get(author_key, 0)
+        raw_body = bodies[cursor] if cursor < len(bodies) else ""
+        author_cursor[author_key] = cursor + 1
+
+        result.append({
+            "author": author,
+            "reply_to": reply_to,
+            "summary": summary,
+            "sentiment": sentiment,
+            "sentiment_signals": signals,
+            "has_inline_review": inline,
+            "tags_given": tags,
+            "analysis_source": rc.get("analysis_source", "llm"),
+            "raw_body": raw_body,
+        })
+
+    return result
 
 
 def analyze_thread_llm(
@@ -1529,7 +1750,7 @@ def analyze_thread_llm(
         if cached is not None:
             logger.debug("LLM cache hit for %s", activity_item.message_id)
             participant_count = _count_participants_simple(thread_messages)
-            return _build_conversation_summary(cached, participant_count)
+            return _build_conversation_summary(cached, participant_count, thread_messages)
 
     # --- Per-reviewer decomposition for Ollama on large threads ---
     if _should_use_per_reviewer_mode(backend, thread_messages, force_monolithic):
@@ -1561,6 +1782,8 @@ def analyze_thread_llm(
                             "sentiment_signals": rc.sentiment_signals,
                             "has_inline_review": rc.has_inline_review,
                             "tags_given": rc.tags_given,
+                            "raw_body": rc.raw_body,
+                            "reply_to": rc.reply_to,
                         }
                         for rc in summary.review_comments
                     ],
@@ -1626,14 +1849,36 @@ def analyze_thread_llm(
             )
             logger.debug("LLM response dumped to: %s", dump_path)
 
-        # Cache the parsed result
+        # Merge per-message entries into per-(author, reply_to) blocks,
+        # mirroring the tree structure produced by per-reviewer mode.
+        merged_comments = _merge_monolithic_review_comments(
+            parsed.get("review_comments", []), thread_messages,
+        )
+        parsed["review_comments"] = merged_comments
+
+        # Override overall sentiment/progress with heuristic derivations so
+        # that both code paths behave consistently:
+        #   - overall_sentiment: worst-case across merged reviewer sentiments
+        #   - discussion_progress: heuristic (reliable, no LLM needed)
+        overall_sentiment, overall_signals = _derive_overall_sentiment(merged_comments)
+        parsed["overall_sentiment"] = overall_sentiment
+        parsed["overall_sentiment_signals"] = overall_signals
+        heuristic_progress, heuristic_progress_detail = _determine_discussion_progress(
+            thread_messages, activity_item.subject
+        )
+        parsed["discussion_progress"] = (
+            heuristic_progress.value.upper() if heuristic_progress else ""
+        )
+        parsed["progress_detail"] = heuristic_progress_detail
+
+        # Cache the merged+normalised result
         if cache:
             cache.put(cache_key, parsed)
 
         participant_count = _count_participants_simple(thread_messages)
-        summary = _build_conversation_summary(parsed, participant_count)
+        summary = _build_conversation_summary(parsed, participant_count, thread_messages)
         logger.info(
-            "LLM analysis complete for %s: sentiment=%s, progress=%s, %d reviews",
+            "LLM analysis complete for %s: sentiment=%s, progress=%s, %d review blocks",
             activity_item.message_id,
             summary.sentiment.value,
             summary.discussion_progress.value if summary.discussion_progress else "none",

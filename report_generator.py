@@ -89,6 +89,10 @@ def _render_review_comment(rc: ReviewComment) -> str:
     parts.append('<div class="review-comment-header">')
     parts.append(f'<span class="review-author">{_esc(rc.author)}</span>')
 
+    # Reply-to context
+    if rc.reply_to:
+        parts.append(f'<span class="reply-to-label">↳ replying to {_esc(rc.reply_to)}</span>')
+
     # Inline review indicator
     if rc.has_inline_review:
         parts.append('<span class="inline-review-badge">Inline Review</span>')
@@ -107,6 +111,13 @@ def _render_review_comment(rc: ReviewComment) -> str:
     # Comment summary text
     if rc.summary:
         parts.append(f'<div class="review-comment-text">{_esc(rc.summary)}</div>')
+
+    # Collapsible raw body text
+    if rc.raw_body:
+        parts.append('<details class="raw-body-toggle">')
+        parts.append('<summary>Show original comment</summary>')
+        parts.append(f'<pre class="raw-body-text">{_esc(rc.raw_body)}</pre>')
+        parts.append('</details>')
 
     # Sentiment signals
     if rc.sentiment_signals:
@@ -482,6 +493,8 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                     "has_inline_review": rc.has_inline_review,
                     "tags_given": rc.tags_given,
                     "analysis_source": rc.analysis_source,
+                    "raw_body": rc.raw_body,
+                    "reply_to": rc.reply_to,
                 })
             results.append({
                 "message_id": item.message_id,
@@ -492,6 +505,7 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                 "date": daily_report.date,
                 "report_file": report_filename,
                 "analysis_source": conv.analysis_source,
+                "patch_summary": conv.patch_summary or "",
                 "reviews": reviews,
             })
     return results
@@ -819,6 +833,11 @@ def generate_html_report(
             font-weight: 600;
             color: #333;
         }}
+        .reply-to-label {{
+            font-size: 0.78em;
+            color: #888;
+            font-style: italic;
+        }}
         .inline-review-badge {{
             display: inline-block;
             padding: 0 6px;
@@ -846,6 +865,35 @@ def generate_html_report(
             font-size: 0.9em;
             color: #999;
             font-style: italic;
+        }}
+        .raw-body-toggle {{
+            margin-top: 4px;
+            font-size: 0.85em;
+            border-top: none;
+        }}
+        .raw-body-toggle summary {{
+            cursor: pointer;
+            color: #666;
+            padding: 2px 0;
+            font-weight: 500;
+            font-size: 0.9em;
+        }}
+        .raw-body-toggle summary:hover {{
+            color: #333;
+            background: transparent;
+        }}
+        .raw-body-text {{
+            white-space: pre-wrap;
+            font-size: 1em;
+            background: #f8f8f8;
+            padding: 8px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 4px;
+            line-height: 1.5;
+            color: #444;
+            border: 1px solid #e8e8e8;
         }}
         .review-comments-compact {{
             margin-top: 8px;

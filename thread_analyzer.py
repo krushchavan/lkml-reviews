@@ -375,10 +375,14 @@ def _extract_patch_summary(messages: List[Dict], subject: str) -> str:
     if not paragraphs:
         return ""
 
-    # For cover letters, allow a much longer summary (up to ~1000 chars)
-    # since they're written specifically to explain the whole series.
-    # For single patches, up to ~600 chars.
-    max_chars = 1000 if is_cover_letter else 600
+    # Summary length scales with input size — larger descriptions get
+    # longer summaries.  Cover letters get a higher floor/ceiling since
+    # they're written specifically to explain the whole series.
+    body_len = len(body)
+    if is_cover_letter:
+        max_chars = max(500, min(2000, body_len // 2))
+    else:
+        max_chars = max(300, min(1200, body_len // 2))
 
     result_parts: List[str] = []
     char_count = 0
@@ -803,26 +807,31 @@ def _extract_review_comments(
         if not all_bodies and not all_tags:
             continue
 
-        # Build the comment summary from all their messages
+        # Preserve raw body text (quote-stripped but not truncated)
+        raw_body = "\n\n---\n\n".join(all_bodies)
+
+        # Build the comment summary from all their messages.
+        # Budget scales with input size — larger comments get longer summaries.
+        total_body_chars = sum(len(b) for b in all_bodies)
         comment_parts: List[str] = []
-        # Give more budget to the first (most important) message
         for i, body in enumerate(all_bodies):
-            budget = 400 if i == 0 else 250
+            budget = max(200, min(800, len(body) // 3))
             extracted = _extract_comment_body(body, max_chars=budget)
             if extracted:
                 comment_parts.append(extracted)
 
-        # Join all their comments (cap total at ~500 chars)
+        # Join all their comments — cap scales with total input size
         if comment_parts:
+            combined_cap = max(300, min(2000, total_body_chars // 3))
             combined = " ".join(comment_parts)
-            if len(combined) > 500:
-                truncated = combined[:500]
+            if len(combined) > combined_cap:
+                truncated = combined[:combined_cap]
                 last_break = max(
                     truncated.rfind("."),
                     truncated.rfind("?"),
                     truncated.rfind("!"),
                 )
-                if last_break > 250:
+                if last_break > combined_cap // 2:
                     combined = truncated[:last_break + 1]
                 else:
                     combined = truncated.rsplit(" ", 1)[0] + "..."
@@ -854,6 +863,7 @@ def _extract_review_comments(
             has_inline_review=has_inline,
             tags_given=unique_tags,
             analysis_source="heuristic",
+            raw_body=raw_body,
         ))
 
     # Sort: patch author last, then by number of messages (most active first)

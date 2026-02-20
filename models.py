@@ -52,6 +52,8 @@ class ReviewComment:
     has_inline_review: bool = False     # True if they did inline code review
     tags_given: list[str] = field(default_factory=list)  # e.g. ["Reviewed-by", "Tested-by"]
     analysis_source: str = "heuristic"  # "heuristic" or "llm"
+    raw_body: str = ""                  # Original comment text (quote-stripped, multi-msg joined)
+    reply_to: str = ""                  # Short name of who this comment is replying to (if known)
 
 
 @dataclass

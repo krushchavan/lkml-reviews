@@ -289,11 +289,12 @@ def process_developer(
         acks = []
 
     logger.info(
-        "  %s: %d patches, %d reviews, %d acks (today)",
+        "  %s: %d patches, %d reviews, %d acks (%s)",
         developer.name,
         len(patches),
         len(reviews),
         len(acks),
+        date_str,
     )
 
     # --- 14-day lookback: find recent patches with activity today ---
@@ -562,6 +563,8 @@ def generate_single_report(
             }
             if item_data.get("analysis_source"):
                 date_entry["analysis_source"] = item_data["analysis_source"]
+            if item_data.get("patch_summary"):
+                date_entry["patch_summary"] = item_data["patch_summary"]
             dates[item_data["date"]] = date_entry
 
             merged = {
