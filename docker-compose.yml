@@ -26,6 +26,11 @@ services:
       # Linux: set to your user/group ID so files are owned by you (run `id` to check)
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      # GitHub Pages publishing — set in .env to auto-push reports after each run
+      # Token needs "Contents: write" permission on the target repository
+      - GITHUB_REPO=${GITHUB_REPO:-}
+      - GITHUB_BRANCH=${GITHUB_BRANCH:-main}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     depends_on:
       - ollama
 

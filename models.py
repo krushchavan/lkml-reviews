@@ -9,6 +9,7 @@ class ActivityType(Enum):
     PATCH_SUBMITTED = "patch_submitted"
     PATCH_REVIEWED = "patch_reviewed"
     PATCH_ACKED = "patch_acked"
+    DISCUSSION_POSTED = "discussion_posted"  # RFC/LSF topic/plain discussion thread
 
 
 class Sentiment(Enum):
@@ -106,6 +107,7 @@ class DeveloperReport:
     patches_submitted: list[ActivityItem] = field(default_factory=list)
     patches_reviewed: list[ActivityItem] = field(default_factory=list)
     patches_acked: list[ActivityItem] = field(default_factory=list)
+    discussions_posted: list[ActivityItem] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 

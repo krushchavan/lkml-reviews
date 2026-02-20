@@ -243,12 +243,33 @@ def check_thread_activity_on_date(
     return False
 
 
+# Patterns that identify a root (non-reply) message as an RFC or discussion thread.
+# Matched against the message subject (case-insensitive).
+_DISCUSSION_TAG_PATTERNS = [
+    r"\[RFC\]",                  # plain [RFC] without PATCH
+    r"\[LSF",                    # LSF/MM/BPF topics
+    r"\[TOPIC\]",                # generic [TOPIC]
+    r"\[DISCUSS",                # [DISCUSS] / [DISCUSSION]
+    r"\[ANN\]",                  # announcements
+    r"\[ANNOUNCE\]",
+]
+
+_DISCUSSION_TAG_RE = re.compile(
+    "|".join(_DISCUSSION_TAG_PATTERNS), re.IGNORECASE
+)
+
+
+def _is_discussion(title: str) -> bool:
+    """Return True if this non-reply, non-patch subject is a discussion/RFC thread."""
+    return bool(_DISCUSSION_TAG_RE.search(title))
+
+
 def classify_messages(
     entries: List[dict],
     developer: Developer,
     raw_fetcher: Callable[[str], str],
-) -> Tuple[List[ActivityItem], List[ActivityItem], List[ActivityItem]]:
-    """Classify Atom feed entries into patches submitted, reviewed, and acked.
+) -> Tuple[List[ActivityItem], List[ActivityItem], List[ActivityItem], List[ActivityItem]]:
+    """Classify Atom feed entries into patches submitted, reviewed, acked, and discussions.
 
     Args:
         entries: List of dicts from get_user_messages_for_date.
@@ -256,11 +277,12 @@ def classify_messages(
         raw_fetcher: Callable that takes message_id and returns raw body text.
 
     Returns:
-        Tuple of (patches_submitted, patches_reviewed, patches_acked).
+        Tuple of (patches_submitted, patches_reviewed, patches_acked, discussions_posted).
     """
     patches: List[ActivityItem] = []
     reviews: List[ActivityItem] = []
     acks: List[ActivityItem] = []
+    discussions: List[ActivityItem] = []
 
     for entry in entries:
         title = entry.get("title", "")
@@ -281,7 +303,7 @@ def classify_messages(
         has_patch_tag = bool(re.search(r"\[(?:RFC\s+)?PATCH", title))
 
         if not is_reply and has_patch_tag:
-            # Patch submission
+            # Patch submission (includes [RFC PATCH ...])
             patches.append(ActivityItem(
                 activity_type=ActivityType.PATCH_SUBMITTED,
                 subject=title,
@@ -290,6 +312,17 @@ def classify_messages(
                 date=updated,
             ))
             logger.debug("PATCH: %s", title)
+
+        elif not is_reply and _is_discussion(title):
+            # Root message for a discussion/RFC/LSF topic thread
+            discussions.append(ActivityItem(
+                activity_type=ActivityType.DISCUSSION_POSTED,
+                subject=title,
+                message_id=msg_id,
+                url=url,
+                date=updated,
+            ))
+            logger.debug("DISCUSSION: %s", title)
 
         elif is_reply:
             # Need body to distinguish review from ack
@@ -326,9 +359,9 @@ def classify_messages(
             else:
                 logger.debug("SKIPPED (reply, no review signals): %s", title)
         else:
-            logger.debug("SKIPPED (not patch, not reply): %s", title)
+            logger.debug("SKIPPED (not patch, not reply, not discussion): %s", title)
 
     # Deduplicate patch series
     patches = _deduplicate_patches(patches)
 
-    return patches, reviews, acks
+    return patches, reviews, acks, discussions

@@ -17,6 +17,11 @@ LLM-enriched summaries (single backend):
 Multi-LLM comparison (both Ollama and Anthropic):
     python generate_report.py --llm-all                    # Both backends, default models
     python generate_report.py --llm-all --ollama-model llama3.2 --anthropic-model claude-sonnet-4-5
+
+Publishing to GitHub Pages:
+    python generate_report.py --publish-github             # Push reports/ to GitHub (uses GITHUB_REPO env var)
+    python generate_report.py --publish-github --github-repo owner/repo
+    python generate_report.py --publish-github --github-branch gh-pages
 """
 
 import argparse
@@ -25,11 +30,42 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+
+def _load_dotenv(env_path: Path = Path(".env")) -> None:
+    """Load key=value pairs from a .env file into os.environ.
+
+    Only sets variables that are NOT already present in the environment so
+    that real environment variables and Docker --env flags always take
+    precedence over the .env file.  Lines starting with '#' and blank lines
+    are ignored.  Values may optionally be quoted with single or double quotes.
+    """
+    if not env_path.exists():
+        return
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+            # Strip optional surrounding quotes
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError:
+        pass  # Non-fatal — .env is optional
+
+
+_load_dotenv()
 
 from activity_classifier import (
     check_thread_activity_on_date,
@@ -185,6 +221,54 @@ def parse_args() -> argparse.Namespace:
         help="Only run the purge (no report generation).",
     )
 
+    # GitHub publishing options
+    github_group = parser.add_argument_group("GitHub publishing")
+    github_group.add_argument(
+        "--publish-github",
+        action="store_true",
+        help=(
+            "Push the reports directory to a GitHub repository after generation. "
+            "Requires git to be installed and the repo to be configured via "
+            "--github-repo or the GITHUB_REPO environment variable."
+        ),
+    )
+    github_group.add_argument(
+        "--github-repo",
+        type=str,
+        default=None,
+        help=(
+            "GitHub repository to publish to, in 'owner/repo' format "
+            "(e.g. 'myorg/lkml-reports'). Falls back to GITHUB_REPO env var. "
+            "The reports directory will be pushed as the root of this repo."
+        ),
+    )
+    github_group.add_argument(
+        "--github-branch",
+        type=str,
+        default="main",
+        help="Branch to push reports to. Default: main.",
+    )
+    github_group.add_argument(
+        "--github-token",
+        type=str,
+        default=None,
+        help=(
+            "GitHub personal access token (or fine-grained token) used to "
+            "authenticate the push. Falls back to the GITHUB_TOKEN environment "
+            "variable. The token is spliced into the remote URL so no separate "
+            "credential helper is needed — safe for Docker/CI use."
+        ),
+    )
+    github_group.add_argument(
+        "--publish-only",
+        action="store_true",
+        help=(
+            "Skip report generation and push the existing reports directory to "
+            "GitHub immediately. Useful for testing the GitHub flow or for "
+            "re-publishing after a manual edit. Implies --publish-github."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -273,12 +357,13 @@ def process_developer(
 
     if all_entries:
         try:
-            patches, reviews, acks = classify_messages(
+            patches, reviews, acks, discussions = classify_messages(
                 all_entries, developer, raw_fetcher
             )
             report.patches_submitted = patches
             report.patches_reviewed = reviews
             report.patches_acked = acks
+            report.discussions_posted = discussions
         except Exception as e:
             err_msg = f"Classification failed for {developer.name}: {e}"
             logger.warning("  %s", err_msg)
@@ -408,7 +493,7 @@ def process_developer(
 
     # Fetch threads for conversation summaries on all items
     if not skip_threads:
-        all_items = report.patches_submitted + reviews + acks
+        all_items = report.patches_submitted + reviews + acks + report.discussions_posted
 
         for item in all_items:
             msg_id = item.message_id
@@ -528,6 +613,7 @@ def generate_single_report(
             daily_report.total_patches += len(dev_report.patches_submitted)
             daily_report.total_reviews += len(dev_report.patches_reviewed)
             daily_report.total_acks += len(dev_report.patches_acked)
+            # discussions_posted not counted in totals (separate stat in HTML)
 
         daily_report.generation_time_seconds = time.time() - start_time
 
@@ -759,6 +845,188 @@ def _record_run(logs_dir: Path, entry: dict) -> None:
     )
 
 
+def publish_to_github(
+    reports_dir: Path,
+    repo: str,
+    branch: str = "main",
+    token: str = "",
+) -> bool:
+    """Commit all changes in reports_dir and push to a GitHub repository.
+
+    The reports directory is treated as a self-contained git repository.
+    On first use it will be initialised with ``git init`` and the remote added.
+    On subsequent runs it re-uses the existing repo.
+
+    If ``token`` is provided it is embedded in the remote URL as
+    ``https://x-access-token:<token>@github.com/owner/repo.git`` so that no
+    separate credential helper or SSH key is required.  This is the standard
+    approach for Docker / CI environments.  The token-bearing URL is stored
+    only in the local ``.git/config`` of the (ephemeral) reports directory and
+    is never logged.
+
+    Args:
+        reports_dir: Path to the reports directory to publish.
+        repo: GitHub repository slug, e.g. ``"owner/repo"``.
+        branch: Branch name to push to. Default: ``"main"``.
+        token: GitHub personal access token or fine-grained token. Optional —
+            falls back to whatever git credential helper is configured.
+
+    Returns:
+        True on success, False if any git command fails.
+    """
+    def _run(cmd: list[str], cwd: Path, redact: str = "") -> subprocess.CompletedProcess:
+        display = " ".join(cmd)
+        if redact:
+            display = display.replace(redact, "***")
+        logger.debug("git: %s (cwd=%s)", display, cwd)
+        return subprocess.run(
+            cmd, cwd=str(cwd),
+            capture_output=True, text=True,
+        )
+
+    # Normalise repo to "owner/repo" slug regardless of whether a full URL was given.
+    # Accepted formats:
+    #   https://github.com/owner/repo.git  →  owner/repo
+    #   https://github.com/owner/repo      →  owner/repo
+    #   git@github.com:owner/repo.git      →  owner/repo
+    #   owner/repo                         →  owner/repo  (passthrough)
+    slug = repo.strip()
+    m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", slug)
+    if m:
+        slug = m.group(1)
+
+    # Build URLs — one safe (for logging), one with embedded token (for git)
+    public_url = f"https://github.com/{slug}.git"
+    if token:
+        push_url = f"https://x-access-token:{token}@github.com/{slug}.git"
+    else:
+        push_url = public_url
+
+    git_dir = reports_dir / ".git"
+
+    # --- Initialise repo if not already a git repo ---
+    if not git_dir.exists():
+        logger.info("GitHub publish: initialising git repo in %s", reports_dir)
+        r = _run(["git", "init", "-b", branch], reports_dir)
+        if r.returncode != 0:
+            # Older git versions don't support -b; init then rename
+            _run(["git", "init"], reports_dir)
+            _run(["git", "checkout", "-b", branch], reports_dir)
+
+        # Set a minimal identity so commits work in CI / Docker environments
+        # that have no global git config.
+        _run(["git", "config", "user.email", "lkml-tracker@localhost"], reports_dir)
+        _run(["git", "config", "user.name", "LKML Tracker"], reports_dir)
+
+    # --- Ensure remote is configured with the correct (token-bearing) URL ---
+    r = _run(["git", "remote", "get-url", "origin"], reports_dir)
+    if r.returncode != 0:
+        logger.info("GitHub publish: adding remote origin → %s", public_url)
+        r = _run(["git", "remote", "add", "origin", push_url], reports_dir,
+                 redact=token)
+        if r.returncode != 0:
+            logger.error("GitHub publish: failed to add remote: %s", r.stderr.strip())
+            return False
+    else:
+        # Update URL whenever token or repo slug may have changed
+        _run(["git", "remote", "set-url", "origin", push_url], reports_dir,
+             redact=token)
+        logger.debug("GitHub publish: remote origin set to %s", public_url)
+
+    # --- Stage all changes ---
+    r = _run(["git", "add", "-A"], reports_dir)
+    if r.returncode != 0:
+        logger.error("GitHub publish: git add failed: %s", r.stderr.strip())
+        return False
+
+    # Check if there's actually anything to commit and log a clear summary
+    r = _run(["git", "status", "--porcelain"], reports_dir)
+    has_changes = bool(r.stdout.strip())
+
+    if not has_changes:
+        # Nothing new to commit — but we may still need to push a previous
+        # commit that failed to reach the remote (e.g. after a 403 that was
+        # since fixed). Check whether HEAD is ahead of the remote tracking
+        # branch and push if so, otherwise we are genuinely up to date.
+        r_ahead = _run(
+            ["git", "rev-list", "--count", "@{u}..HEAD"],
+            reports_dir,
+        )
+        if r_ahead.returncode != 0 or r_ahead.stdout.strip() == "0":
+            logger.info("GitHub publish: nothing to commit, reports are up to date.")
+            return True
+        ahead = r_ahead.stdout.strip()
+        logger.info(
+            "GitHub publish: nothing new to commit but %s unpushed commit(s) found — pushing now",
+            ahead,
+        )
+
+    if has_changes:
+        # Parse and log a human-readable diff summary (added / modified / deleted)
+        added, modified, deleted = [], [], []
+        for line in r.stdout.splitlines():
+            if len(line) < 3:
+                continue
+            xy = line[:2]
+            path = line[3:]
+            if "A" in xy:
+                added.append(path)
+            elif "D" in xy:
+                deleted.append(path)
+            elif "M" in xy or "R" in xy:
+                modified.append(path)
+        logger.info(
+            "GitHub publish: %d added, %d modified, %d deleted",
+            len(added), len(modified), len(deleted),
+        )
+        for f in added:
+            logger.info("  + %s", f)
+        for f in modified:
+            logger.info("  ~ %s", f)
+        for f in deleted:
+            logger.info("  - %s", f)
+
+        # --- Commit ---
+        commit_msg = f"LKML reports update {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}"
+        r = _run(["git", "commit", "-m", commit_msg], reports_dir)
+        if r.returncode != 0:
+            logger.error("GitHub publish: git commit failed: %s", r.stderr.strip())
+            return False
+        logger.info("GitHub publish: committed — %s", commit_msg)
+
+    # --- Push ---
+    # Check whether our branch already tracks the remote. If it does we use
+    # --force-with-lease (safe: aborts if someone else pushed since we last
+    # fetched). If there is no upstream yet — e.g. the remote was initialised
+    # with a GitHub README that we don't have locally — we force-push to make
+    # this repo the authoritative source of truth for generated reports.
+    logger.info("GitHub publish: pushing to %s (branch: %s)…", slug, branch)
+    r_upstream = _run(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+        reports_dir,
+    )
+    has_upstream = r_upstream.returncode == 0 and r_upstream.stdout.strip()
+
+    if has_upstream:
+        push_cmd = ["git", "push", "-u", "origin", branch, "--force-with-lease"]
+    else:
+        # No upstream yet — remote may have divergent history (e.g. auto-README).
+        # Force-push to establish this repo as the source of truth.
+        logger.info("GitHub publish: no upstream set, using --force for initial push")
+        push_cmd = ["git", "push", "-u", "origin", branch, "--force"]
+
+    r = _run(push_cmd, reports_dir)
+    if r.returncode != 0:
+        logger.error(
+            "GitHub publish: git push failed:\n%s\n%s",
+            r.stdout.strip(), r.stderr.strip(),
+        )
+        return False
+
+    logger.info("GitHub publish: pushed successfully to %s/%s", repo, branch)
+    return True
+
+
 def main():
     args = parse_args()
 
@@ -773,6 +1041,31 @@ def main():
         reports_dir = Path(args.output_dir)
         logs_dir = Path(args.logs_dir)
         purge_old_files(reports_dir, logs_dir, args.retention_days)
+        return
+
+    # --- Publish-only mode (test/re-publish without regenerating reports) ---
+    if args.publish_only:
+        repo = args.github_repo or os.environ.get("GITHUB_REPO", "")
+        if not repo:
+            logger.error(
+                "GitHub publish: no repository specified. "
+                "Use --github-repo owner/repo or set the GITHUB_REPO environment variable."
+            )
+            sys.exit(1)
+        token = args.github_token or os.environ.get("GITHUB_TOKEN", "")
+        if not token:
+            logger.warning(
+                "GitHub publish: no token provided. Falling back to git credential "
+                "helper. Set --github-token or GITHUB_TOKEN for Docker/CI environments."
+            )
+        branch = args.github_branch
+        if branch == "main":
+            branch = os.environ.get("GITHUB_BRANCH", branch)
+        reports_dir = Path(args.output_dir)
+        ok = publish_to_github(reports_dir, repo, branch=branch, token=token)
+        if not ok:
+            logger.error("GitHub publish: failed — see errors above.")
+            sys.exit(1)
         return
 
     # Determine target end date
@@ -895,6 +1188,31 @@ def main():
         reports_dir = Path(args.output_dir)
         logs_dir = Path(args.logs_dir)
         purge_old_files(reports_dir, logs_dir, args.retention_days)
+
+    # --- GitHub publishing (if requested) ---
+    if args.publish_github:
+        repo = args.github_repo or os.environ.get("GITHUB_REPO", "")
+        if not repo:
+            logger.error(
+                "GitHub publish: no repository specified. "
+                "Use --github-repo owner/repo or set the GITHUB_REPO environment variable."
+            )
+            sys.exit(1)
+        token = args.github_token or os.environ.get("GITHUB_TOKEN", "")
+        if not token:
+            logger.warning(
+                "GitHub publish: no token provided. Falling back to git credential "
+                "helper. Set --github-token or GITHUB_TOKEN for Docker/CI environments."
+            )
+        # Branch: CLI flag > GITHUB_BRANCH env var > argparse default ("main")
+        branch = args.github_branch
+        if branch == "main":  # argparse default — check if env var overrides it
+            branch = os.environ.get("GITHUB_BRANCH", branch)
+        reports_dir = Path(args.output_dir)
+        ok = publish_to_github(reports_dir, repo, branch=branch, token=token)
+        if not ok:
+            logger.error("GitHub publish: failed — see errors above.")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

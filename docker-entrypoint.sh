@@ -67,21 +67,32 @@ if [ -n "$CRON_SCHEDULE" ]; then
     [ -n "$OUTPUT_DIR" ] && echo "OUTPUT_DIR=$OUTPUT_DIR" >> "$ENV_FILE"
     [ -n "$LLM_CACHE_DIR" ] && echo "LLM_CACHE_DIR=$LLM_CACHE_DIR" >> "$ENV_FILE"
     [ -n "$RETENTION_DAYS" ] && echo "RETENTION_DAYS=$RETENTION_DAYS" >> "$ENV_FILE"
+    [ -n "$GITHUB_REPO" ] && echo "GITHUB_REPO=$GITHUB_REPO" >> "$ENV_FILE"
+    [ -n "$GITHUB_BRANCH" ] && echo "GITHUB_BRANCH=$GITHUB_BRANCH" >> "$ENV_FILE"
+    [ -n "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=$GITHUB_TOKEN" >> "$ENV_FILE"
     # Add PATH so python is found
     echo "PATH=$PATH" >> "$ENV_FILE"
 
-    # Build the post-report commands (index + review pages)
+    # Build the post-report commands (index + review pages + optional GitHub publish)
     INDEX_CMD="cd /app && python build_index.py --reports-dir /app/reports --logs-dir ${LOG_DIR}"
     REVIEWS_CMD="cd /app && python build_reviews.py --reports-dir /app/reports"
+    PUBLISH_CMD=""
+    if [ -n "$GITHUB_REPO" ] && [ -n "$GITHUB_TOKEN" ]; then
+        PUBLISH_CMD="cd /app && python generate_report.py --publish-only --logs-dir ${LOG_DIR}"
+    fi
     if [ -n "$RUN_AS" ]; then
         INDEX_CMD="su -s /bin/bash $RUN_AS -c '$INDEX_CMD'"
         REVIEWS_CMD="su -s /bin/bash $RUN_AS -c '$REVIEWS_CMD'"
+        [ -n "$PUBLISH_CMD" ] && PUBLISH_CMD="su -s /bin/bash $RUN_AS -c '$PUBLISH_CMD'"
     fi
 
     # Write crontab entry
     # Per-report logs are created by Python; stdout goes to Docker logs via PID 1
-    # After report generation, rebuild review pages and index page
+    # After report generation, rebuild review pages, index page, then publish to GitHub
     CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && $REPORT_CMD >> /proc/1/fd/1 2>&1 && $REVIEWS_CMD >> /proc/1/fd/1 2>&1 && $INDEX_CMD >> /proc/1/fd/1 2>&1"
+    if [ -n "$PUBLISH_CMD" ]; then
+        CRON_LINE="$CRON_LINE && $PUBLISH_CMD >> /proc/1/fd/1 2>&1"
+    fi
     echo "$CRON_LINE" | crontab -
 
     echo "[entrypoint] Cron job installed. Waiting for schedule..."
@@ -96,6 +107,10 @@ if [ -n "$CRON_SCHEDULE" ]; then
         run_cmd "cd /app && python build_reviews.py --reports-dir /app/reports"
         echo "[entrypoint] Rebuilding index page..."
         run_cmd "cd /app && python build_index.py --reports-dir /app/reports --logs-dir ${LOG_DIR}"
+        if [ -n "$GITHUB_REPO" ] && [ -n "$GITHUB_TOKEN" ]; then
+            echo "[entrypoint] Publishing to GitHub..."
+            run_cmd "cd /app && python generate_report.py --publish-only --logs-dir ${LOG_DIR}"
+        fi
     fi
 
     # Start cron in foreground (cron itself must run as root)
@@ -110,4 +125,8 @@ else
     run_cmd "cd /app && python build_reviews.py --reports-dir /app/reports"
     echo "[entrypoint] Rebuilding index page..."
     run_cmd "cd /app && python build_index.py --reports-dir /app/reports --logs-dir ${LOG_DIR}"
+    if [ -n "$GITHUB_REPO" ] && [ -n "$GITHUB_TOKEN" ]; then
+        echo "[entrypoint] Publishing to GitHub..."
+        run_cmd "cd /app && python generate_report.py --publish-only --logs-dir ${LOG_DIR}"
+    fi
 fi

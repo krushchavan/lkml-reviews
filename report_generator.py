@@ -346,6 +346,7 @@ def _render_developer_section(
         len(dev_report.patches_submitted)
         + len(dev_report.patches_reviewed)
         + len(dev_report.patches_acked)
+        + len(dev_report.discussions_posted)
     )
 
     parts = []
@@ -367,6 +368,10 @@ def _render_developer_section(
 
     parts.append(_render_activity_section(
         dev_report.patches_submitted, "Patches Submitted", "patch",
+        open_by_default=True, review_links=review_links, report_date=report_date
+    ))
+    parts.append(_render_activity_section(
+        dev_report.discussions_posted, "Discussions / RFCs", "discussion",
         open_by_default=True, review_links=review_links, report_date=report_date
     ))
     parts.append(_render_activity_section(
@@ -401,14 +406,22 @@ def _render_statistics(report: DailyReport) -> str:
         1
         for dr in report.developer_reports
         if dr.patches_submitted or dr.patches_reviewed or dr.patches_acked
+            or dr.discussions_posted
     )
     total_devs = len(report.developer_reports)
+
+    total_discussions = sum(len(dr.discussions_posted) for dr in report.developer_reports)
 
     # Build per-card contributor lists
     patch_contributors = [
         (dr.developer.name, len(dr.patches_submitted))
         for dr in report.developer_reports
         if dr.patches_submitted
+    ]
+    discussion_contributors = [
+        (dr.developer.name, len(dr.discussions_posted))
+        for dr in report.developer_reports
+        if dr.discussions_posted
     ]
     review_contributors = [
         (dr.developer.name, len(dr.patches_reviewed))
@@ -421,15 +434,27 @@ def _render_statistics(report: DailyReport) -> str:
         if dr.patches_acked
     ]
     active_names = [
-        (dr.developer.name, len(dr.patches_submitted) + len(dr.patches_reviewed) + len(dr.patches_acked))
+        (dr.developer.name, len(dr.patches_submitted) + len(dr.patches_reviewed)
+         + len(dr.patches_acked) + len(dr.discussions_posted))
         for dr in report.developer_reports
         if dr.patches_submitted or dr.patches_reviewed or dr.patches_acked
+            or dr.discussions_posted
     ]
 
     patch_tooltip = _build_contributor_tooltip(patch_contributors)
+    discussion_tooltip = _build_contributor_tooltip(discussion_contributors)
     review_tooltip = _build_contributor_tooltip(review_contributors)
     ack_tooltip = _build_contributor_tooltip(ack_contributors)
     active_tooltip = _build_contributor_tooltip(active_names)
+
+    discussion_card = ""
+    if total_discussions:
+        discussion_card = f"""
+        <div class="stat-card">
+            <div class="stat-number">{total_discussions}</div>
+            <div class="stat-label">Discussions / RFCs</div>
+            {discussion_tooltip}
+        </div>"""
 
     return f"""
     <div class="stats-grid">
@@ -437,7 +462,7 @@ def _render_statistics(report: DailyReport) -> str:
             <div class="stat-number">{report.total_patches}</div>
             <div class="stat-label">Patches Submitted</div>
             {patch_tooltip}
-        </div>
+        </div>{discussion_card}
         <div class="stat-card">
             <div class="stat-number">{report.total_reviews}</div>
             <div class="stat-label">Reviews Given</div>
@@ -478,6 +503,7 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
     for dr in daily_report.developer_reports:
         all_items = (
             dr.patches_submitted + dr.patches_reviewed + dr.patches_acked
+            + dr.discussions_posted
         )
         for item in all_items:
             conv = item.conversation
