@@ -8,6 +8,9 @@ services:
       - ./reports:/app/reports:z
       - ./.llm_cache:/app/.llm_cache:z
       - ./logs:/app/logs:z
+    env_file:
+      - path: ./.env
+        required: false
     environment:
       # Required only for Anthropic backend (--llm-backend anthropic or --llm-all)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
