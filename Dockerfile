@@ -3,9 +3,9 @@ FROM python:3.12-slim
 LABEL maintainer="krush"
 LABEL description="LKML Daily Activity Tracker - generates HTML reports of Linux kernel developer activity"
 
-# Install cron + timezone data and clean up apt cache
+# Install cron, git, timezone data and clean up apt cache
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends cron tzdata && \
+    apt-get install -y --no-install-recommends cron git tzdata && \
     rm -rf /var/lib/apt/lists/*
 
 # Default timezone (overridden by TZ env var in docker-compose)
@@ -29,6 +29,7 @@ COPY thread_analyzer.py .
 COPY report_generator.py .
 COPY build_index.py .
 COPY build_reviews.py .
+COPY clean_reports.py .
 COPY kernel_developers_emails_1.csv .
 
 # Copy entrypoint script and fix Windows line endings
