@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # Increment when prompt templates, _sentence_range(), or _scale_max_tokens() change.
 # This is included in cache keys so that stale cached responses (generated with
 # different prompt instructions) are automatically invalidated.
-_PROMPT_VERSION = "v1"
+_PROMPT_VERSION = "v4"
 
 
 # ---------------------------------------------------------------------------
@@ -333,22 +333,22 @@ def _sentence_range(input_chars: int, summary_type: str) -> str:
     """
     if summary_type == "patch":
         if input_chars < 1000:
-            return "1-2 sentence"
-        elif input_chars < 2000:
             return "2-3 sentence"
+        elif input_chars < 2000:
+            return "3-4 sentence"
         elif input_chars < 4000:
-            return "3-5 sentence"
-        else:
             return "4-6 sentence"
+        else:
+            return "5-7 sentence"
     else:  # reviewer
         if input_chars < 500:
-            return "1-2 sentence"
-        elif input_chars < 2000:
             return "2-3 sentence"
+        elif input_chars < 2000:
+            return "3-5 sentence"
         elif input_chars < 4000:
-            return "3-4 sentence"
+            return "4-6 sentence"
         else:
-            return "4-5 sentence"
+            return "5-7 sentence"
 
 
 def _scale_max_tokens(prompt_len: int, summary_type: str) -> int:
@@ -359,9 +359,9 @@ def _scale_max_tokens(prompt_len: int, summary_type: str) -> int:
         summary_type: "patch_summary" or "reviewer".
     """
     if summary_type == "patch_summary":
-        return max(256, min(1024, prompt_len // 4))
+        return max(400, min(1200, prompt_len // 4))
     else:  # reviewer
-        return max(512, min(2048, prompt_len // 3))
+        return max(800, min(2048, prompt_len // 2))
 
 
 # ---------------------------------------------------------------------------
@@ -782,15 +782,29 @@ def _build_conversation_summary(
     thread_messages: Optional[List[Dict]] = None,
 ) -> ConversationSummary:
     """Convert parsed LLM JSON into a ConversationSummary."""
-    # Build author→raw_body lookup from thread messages for raw text inclusion
+    # Build author→raw_body and author→earliest_date lookups from thread messages
     author_bodies: Dict[str, List[str]] = {}
+    author_earliest_date: Dict[str, str] = {}
     if thread_messages:
+        from email.utils import parsedate
+        import time as _time
         for msg in thread_messages[1:]:  # skip root
             from_field = msg.get("from", "")
             short_name = _extract_author_short(from_field)
+            key = short_name.lower()
             body = msg.get("body", "")
             if body.strip():
-                author_bodies.setdefault(short_name.lower(), []).append(body)
+                author_bodies.setdefault(key, []).append(body)
+            raw_date = msg.get("date", "")
+            if raw_date:
+                try:
+                    parsed_date = parsedate(raw_date)
+                    if parsed_date:
+                        ymd = _time.strftime("%Y-%m-%d", parsed_date)
+                        if key not in author_earliest_date or ymd < author_earliest_date[key]:
+                            author_earliest_date[key] = ymd
+                except Exception:
+                    pass
 
     review_comments = []
     for rc_data in parsed.get("review_comments", []):
@@ -812,6 +826,7 @@ def _build_conversation_summary(
             analysis_source="llm",
             raw_body=raw_body,
             reply_to=rc_data.get("reply_to", ""),
+            message_date=rc_data.get("message_date", "") or author_earliest_date.get(author.lower(), ""),
         ))
 
     overall_sentiment = _map_sentiment(
@@ -926,24 +941,94 @@ def _should_use_per_reviewer_mode(
     return total_chars > 8000
 
 
+def _split_body_into_segments(body: str) -> List[str]:
+    """Split a message body into author-only text segments.
+
+    An inline review email typically interleaves the author's own comments
+    with quoted text from the previous message (lines starting with ">").
+    This function strips all quoted lines and returns the remaining runs of
+    the author's own text as separate segments — one segment per contiguous
+    block of non-quoted lines.
+
+    Example input::
+
+        > void foo() {
+        > }
+        I think we should rename this to bar().
+
+        > int x = compute();
+        This variable is never used — should be removed.
+
+    Returns::
+
+        ["I think we should rename this to bar().",
+         "This variable is never used — should be removed."]
+
+    A single segment is returned when there are no embedded quotes.
+    Empty segments (whitespace only) are discarded.
+    """
+    segments: List[str] = []
+    current: List[str] = []
+
+    for line in body.split("\n"):
+        if line.strip().startswith(">"):
+            # Quoted line — flush the current author segment if non-empty
+            if any(l.strip() for l in current):
+                segments.append("\n".join(current).strip())
+            current = []
+        else:
+            current.append(line)
+
+    # Flush final segment
+    if any(l.strip() for l in current):
+        segments.append("\n".join(current).strip())
+
+    # If nothing survived (e.g. all-quoted message), return the original body
+    # stripped of quote lines so the LLM still gets something useful.
+    if not segments:
+        plain = "\n".join(
+            l for l in body.split("\n") if not l.strip().startswith(">")
+        ).strip()
+        if plain:
+            segments = [plain]
+
+    return segments
+
+
 def _group_messages_by_reviewer(
     messages: List[Dict],
 ) -> Dict[str, Dict]:
-    """Group thread messages by reviewer email, split by reply-to context.
+    """Return one entry per author-text segment within each message.
 
-    When a reviewer replies to multiple different people, their messages are
-    split into separate groups — one per distinct reply-to author.  This
-    produces a tree-like view (e.g. "Zi Yan replying to David" vs "Zi Yan
-    replying to Johannes") rather than one merged blob.
+    For each non-root message, the body is split into author-only segments
+    (contiguous blocks of non-quoted text separated by ">"-prefixed quoted
+    lines).  Each segment becomes its own independent entry so the LLM
+    produces a focused summary for that specific point rather than a blended
+    summary across all of the author's inline comments.
 
-    Returns dict mapping "<email>|<reply_to_email>" -> {
+    Returns dict mapping a unique per-segment key -> {
         "name": "First Last",
         "email": "user@domain.com",
-        "messages": [msg_dict, ...],
+        "messages": [msg_dict],        # synthetic msg with segment body
         "is_author": bool,
-        "reply_to_name": "David Hildenbrand",  # short name, "" if unknown
+        "reply_to_name": "David Hildenbrand",
+        "message_date": "YYYY-MM-DD",  # date of the originating message
+        "raw_body": str,               # the segment text (no quoted lines)
     }
     """
+    from email.utils import parsedate as _parsedate
+    import time as _time2
+
+    def _msg_ymd(msg: Dict) -> str:
+        raw = msg.get("date", "")
+        if not raw:
+            return ""
+        try:
+            pd = _parsedate(raw)
+            return _time2.strftime("%Y-%m-%d", pd) if pd else ""
+        except Exception:
+            return ""
+
     root_email = _extract_email(messages[0].get("from", ""))
 
     # Build a message-id -> (email, short_name) lookup for reply-to resolution
@@ -958,35 +1043,57 @@ def _group_messages_by_reviewer(
             )
 
     groups: Dict[str, Dict] = {}
-    for msg in messages[1:]:  # Skip root message
+    for idx, msg in enumerate(messages[1:], start=1):  # Skip root message
         from_field = msg.get("from", "")
         email = _extract_email(from_field)
         name = _extract_author_short(from_field)
+        ymd = _msg_ymd(msg)
+        msg_id = msg.get("message_id", "").strip("<>") or str(idx)
 
         # Resolve who this message is replying to
         irt = msg.get("in_reply_to", "").strip("<>")
-        reply_to_email = ""
         reply_to_name = ""
         if irt and irt in msgid_to_author:
             reply_to_email, reply_to_name = msgid_to_author[irt]
             # Don't label the reply-to as the reviewer replying to themselves
             if reply_to_email == email:
-                reply_to_email = ""
                 reply_to_name = ""
 
-        # Key: email + reply_to_email (so each distinct conversation branch
-        # gets its own group)
-        group_key = f"{email}|{reply_to_email}"
+        # Split the body into author-only segments
+        body = msg.get("body", "")
+        segments = _split_body_into_segments(body)
 
-        if group_key not in groups:
+        if len(segments) <= 1:
+            # Single segment (or no splits) — one entry for the whole message
+            segment_text = segments[0] if segments else body.strip()
+            # Synthesise a msg dict with only the author's own text
+            synthetic_msg = dict(msg)
+            synthetic_msg["body"] = segment_text
+            group_key = msg_id
             groups[group_key] = {
                 "name": name,
                 "email": email,
-                "messages": [],
+                "messages": [synthetic_msg],
                 "is_author": (email == root_email),
                 "reply_to_name": reply_to_name,
+                "message_date": ymd,
+                "raw_body": segment_text,
             }
-        groups[group_key]["messages"].append(msg)
+        else:
+            # Multiple segments — one entry per segment
+            for seg_idx, segment_text in enumerate(segments):
+                group_key = f"{msg_id}_seg{seg_idx}"
+                synthetic_msg = dict(msg)
+                synthetic_msg["body"] = segment_text
+                groups[group_key] = {
+                    "name": name,
+                    "email": email,
+                    "messages": [synthetic_msg],
+                    "is_author": (email == root_email),
+                    "reply_to_name": reply_to_name,
+                    "message_date": ymd,
+                    "raw_body": segment_text,
+                }
 
     return groups
 
@@ -1139,24 +1246,98 @@ def _build_reviewer_prompt(
     reviewer_messages: List[Dict],
     subject: str,
     reply_to_name: str = "",
+    segment_text: str = "",
+    is_author: bool = False,
 ) -> str:
-    """Build a focused prompt for analyzing a single reviewer's contribution."""
+    """Build a focused prompt for analyzing a single reviewer comment segment.
+
+    ``segment_text`` is the author's own text for this segment, already
+    stripped of quoted (">") lines by ``_split_body_into_segments``.  When
+    provided it is used directly; otherwise the messages are serialised via
+    ``_build_thread_text`` (legacy fallback for callers that don't split).
+
+    When ``is_author`` is True the prompt is reframed: instead of treating
+    the text as a reviewer comment we tell the LLM this is the patch author
+    responding to prior feedback, and ask it to identify what feedback is
+    being addressed and how.
+    """
     sentiment_values = "POSITIVE, NEEDS_WORK, CONTENTIOUS, NEUTRAL"
 
-    # Build text for this reviewer's messages only
-    reviewer_text = _build_thread_text(reviewer_messages, max_chars=5000)
+    # Use pre-extracted segment text when available — it contains only the
+    # author's own words with no "> quoted" lines, giving the LLM a clean,
+    # focused view of exactly what this reviewer said at this point in the thread.
+    if segment_text:
+        reviewer_text = segment_text[:5000]
+        if len(segment_text) > 5000:
+            reviewer_text += "\n[... truncated ...]"
+    else:
+        reviewer_text = _build_thread_text(reviewer_messages, max_chars=5000)
+
     sr = _sentence_range(len(reviewer_text), "reviewer")
 
     reply_context = ""
     if reply_to_name:
-        reply_context = f"\nThis reviewer is replying to: {reply_to_name}\n"
+        reply_context = f"\nThis author is responding to feedback from: {reply_to_name}\n" if is_author else f"\nThis reviewer is replying to: {reply_to_name}\n"
 
-    return f"""You are a senior Linux kernel developer analyzing ONE reviewer's comments on a patch.
+    if is_author:
+        return f"""You are a senior Linux kernel developer analyzing ONE specific reply from the patch AUTHOR in a review thread.
+
+Thread subject: {subject}
+Patch author: {reviewer_name}{reply_context}
+
+The original patch description is provided for context, followed by the author's reply.
+The reply text below contains ONLY the author's own words — quoted lines from prior messages have been removed.
+
+The author is responding to reviewer feedback. Your job is to identify:
+- What prior feedback or concern is being addressed (infer from context if needed)
+- How the author responded: did they agree and promise a fix, push back, ask a clarifying question, or explain their reasoning?
+- Whether the author's response suggests the patch will need further revision
+
+Return a JSON object with exactly these fields:
+{{
+  "summary": "{sr} analytical summary of what feedback the author is addressing and how they responded",
+  "sentiment": "one of: {sentiment_values}",
+  "sentiment_signals": ["signal1", "signal2"],
+  "has_inline_review": false,
+  "tags_given": []
+}}
+
+Field rules:
+- "summary": Written in YOUR OWN words. Be SPECIFIC and DETAILED — name the exact technical
+  issue or concern being addressed, describe the author's specific response or explanation,
+  and state whether a fix is planned. For example: instead of "author addressed a concern
+  about locking", write "author acknowledged that the swapoff path needs to drop the per-vswap
+  spinlock before calling try_to_unmap(), agreed to restructure in v2". Do NOT quote emails.
+  Do NOT use vague phrases like "raised concerns about" or "suggested improvements to".
+- "sentiment": From the author's perspective on the state of the review —
+  NEEDS_WORK = author acknowledges a fix is needed. POSITIVE = author confirms the issue is
+  resolved or agrees with the approach. CONTENTIOUS = author strongly pushes back or disputes
+  the feedback. NEUTRAL = clarification or explanation with no clear resolution signal.
+- "has_inline_review": false (the author is replying, not reviewing).
+- "tags_given": Empty — patch authors do not give review tags.
+
+IMPORTANT:
+- Return ONLY valid JSON. No markdown fences, no explanation.
+- All sentiment values must be UPPERCASE.
+- has_inline_review must be a JSON boolean (true/false).
+- The summary MUST include specific technical details from the reply text, not generic statements.
+
+--- PATCH DESCRIPTION (for context) ---
+{patch_context}
+
+--- AUTHOR REPLY ({reviewer_name}) ---
+{reviewer_text}
+
+--- END ---
+Return your JSON now. Start with {{ end with }}."""
+
+    return f"""You are a senior Linux kernel developer analyzing ONE specific comment from a reviewer on a patch.
 
 Thread subject: {subject}
 Reviewer: {reviewer_name}{reply_context}
 
-The original patch description is provided for context, followed by this reviewer's messages.
+The original patch description is provided for context, followed by the reviewer's comment.
+The comment text below contains ONLY this reviewer's own words — quoted lines have been removed.
 
 Return a JSON object with exactly these fields:
 {{
@@ -1168,23 +1349,30 @@ Return a JSON object with exactly these fields:
 }}
 
 Field rules:
-- "summary": Written in YOUR OWN words. Describe WHAT the reviewer raised, WHETHER they
-  approved or objected, and WHAT specific technical concerns they made. Do NOT quote emails.
+- "summary": Written in YOUR OWN words. Be SPECIFIC and DETAILED — name the exact technical
+  issue raised, explain the reviewer's specific concern or objection, and describe any
+  concrete suggestion they made. For example: instead of "reviewer raised concerns about
+  locking", write "reviewer noted that vswap_free() acquires the per-vswap spinlock while
+  holding the folio lock, creating a lock ordering violation with reclaim paths, and requested
+  the lock be dropped before calling try_to_unmap()". Do NOT quote emails directly.
+  Do NOT use vague phrases like "raised concerns about X" or "suggested improvements to Y"
+  without explaining the actual substance of the concern or suggestion.
 - "sentiment": CONTENTIOUS = strong disagreement/NACK. NEEDS_WORK = requested changes.
   POSITIVE = LGTM/approved. NEUTRAL = no clear signal.
-- "has_inline_review": true if the reviewer quoted code and commented inline.
+- "has_inline_review": true if this comment was made in response to specific quoted code.
 - "tags_given": Only formal kernel tags (Reviewed-by, Acked-by, Tested-by) that the
-  reviewer explicitly gave. Empty list if none.
+  reviewer explicitly gave in this comment. Empty list if none.
 
 IMPORTANT:
 - Return ONLY valid JSON. No markdown fences, no explanation.
 - All sentiment values must be UPPERCASE.
 - has_inline_review must be a JSON boolean (true/false).
+- The summary MUST include specific technical details from the comment, not generic statements.
 
 --- PATCH DESCRIPTION (for context) ---
 {patch_context}
 
---- REVIEWER MESSAGES ({reviewer_name}) ---
+--- REVIEWER COMMENT ({reviewer_name}) ---
 {reviewer_text}
 
 --- END ---
@@ -1417,12 +1605,15 @@ def _analyze_per_reviewer(
         reviewer_msgs = group_info["messages"]
         is_author = group_info["is_author"]
         reply_to_name = group_info.get("reply_to_name", "")
-        # Use email portion of the group key for cache/dump naming
+        # group_key is the message-id — use it directly for cache/dump naming
         email = group_info["email"]
-        # Make cache/dump suffix unique per (email, reply_to) combination
-        cache_suffix = group_key.replace("|", "_rt_")
+        reviewer_earliest_date = group_info.get("message_date", "")
+        # Make cache/dump suffix unique per message (group_key == message-id)
+        cache_suffix = group_key
 
-        # Check for substantive messages
+        # Check for substantive messages — tag-only contributors (e.g. a message
+        # that is just "Reviewed-by: X") are captured via heuristic since there
+        # is no prose for the LLM to analyse.
         has_substance = any(
             not _is_trivial_message(m.get("body", "")) for m in reviewer_msgs
         )
@@ -1443,6 +1634,7 @@ def _analyze_per_reviewer(
                     "tags_given": unique_tags,
                     "analysis_source": "heuristic",
                     "reply_to": reply_to_name,
+                    "message_date": reviewer_earliest_date,
                 })
             continue
 
@@ -1457,15 +1649,20 @@ def _analyze_per_reviewer(
             logger.debug("Per-reviewer cache hit for %s: %s", reviewer_name, activity_item.message_id)
             continue
 
-        # Collect raw body text (quote-stripped, no truncation)
-        reviewer_bodies = [m.get("body", "") for m in reviewer_msgs if m.get("body", "").strip()]
-        reviewer_raw_body = "\n\n---\n\n".join(reviewer_bodies)
+        # The segment text is already quote-stripped (set by _group_messages_by_reviewer).
+        # Use it directly as the raw_body so "Show original" shows only this author's words.
+        segment_text = group_info.get("raw_body", "")
+        reviewer_raw_body = segment_text or "\n\n---\n\n".join(
+            m.get("body", "") for m in reviewer_msgs if m.get("body", "").strip()
+        )
 
         # Build and send reviewer prompt
         label = f"{reviewer_name} (author)" if is_author else reviewer_name
         rv_prompt = _build_reviewer_prompt(
             patch_context_text, label, reviewer_msgs, activity_item.subject,
             reply_to_name=reply_to_name,
+            segment_text=segment_text,
+            is_author=is_author,
         )
 
         logger.info(
@@ -1490,6 +1687,7 @@ def _analyze_per_reviewer(
             if parsed is not None:
                 parsed["raw_body"] = reviewer_raw_body
                 parsed["reply_to"] = reply_to_name
+                parsed["message_date"] = reviewer_earliest_date
                 reviewer_results.append(parsed)
                 if cache:
                     cache.put(rv_cache_key, parsed)
@@ -1506,6 +1704,7 @@ def _analyze_per_reviewer(
                     reviewer_name, reviewer_msgs, is_author, reply_to_name=reply_to_name
                 )
                 if heuristic_rc:
+                    heuristic_rc["message_date"] = reviewer_earliest_date
                     reviewer_results.append(heuristic_rc)
 
         except Exception as e:
@@ -1517,6 +1716,7 @@ def _analyze_per_reviewer(
                 reviewer_name, reviewer_msgs, is_author, reply_to_name=reply_to_name
             )
             if heuristic_rc:
+                heuristic_rc["message_date"] = reviewer_earliest_date
                 reviewer_results.append(heuristic_rc)
 
     # --- Step 3: Assemble Overall Summary ---
@@ -1540,6 +1740,7 @@ def _analyze_per_reviewer(
             analysis_source=rc_data.get("analysis_source", "heuristic"),
             raw_body=rc_data.get("raw_body", ""),
             reply_to=rc_data.get("reply_to", ""),
+            message_date=rc_data.get("message_date", ""),
         ))
 
     logger.info(
@@ -1618,28 +1819,44 @@ def _merge_monolithic_review_comments(
     message with a ``reply_to`` field, mirroring the per-reviewer decomposition.
     This function keeps each entry as its own distinct card — we do NOT combine
     multiple messages from the same author into a single block.  Each message
-    retains its own individual LLM summary, sentiment, and reply_to, so the
-    thread tree can show the full conversation granularity.
+    retains its own individual LLM summary, sentiment, reply_to, and date.
 
-    The only post-processing done here is:
+    Post-processing:
     1. Attaching ``raw_body`` text from the thread messages, indexed by author
        name in encounter order so the "Show original" expander works.
-    2. Ensuring all required fields are present with safe defaults.
+    2. Attaching ``message_date`` (YYYY-MM-DD) from the corresponding thread
+       message so each card shows the correct send date, not the author's
+       earliest date.
+    3. Ensuring all required fields are present with safe defaults.
 
     Returns the list in the original encounter order (as the LLM produced it).
     """
-    # Build author-name -> queue of raw message bodies (in thread order)
-    # so we can attach one body per LLM entry for each author.
-    author_body_queues: Dict[str, List[str]] = {}
+    from email.utils import parsedate as _parsedate
+    import time as _time2
+
+    def _msg_ymd(msg: Dict) -> str:
+        raw = msg.get("date", "")
+        if not raw:
+            return ""
+        try:
+            pd = _parsedate(raw)
+            return _time2.strftime("%Y-%m-%d", pd) if pd else ""
+        except Exception:
+            return ""
+
+    # Build per-author queues of (raw_body, message_date) in thread order
+    # so we can pop one entry per LLM comment in encounter order.
+    author_msg_queues: Dict[str, List[tuple]] = {}
     if thread_messages:
         for msg in thread_messages[1:]:  # skip root
             short = _extract_author_short(msg.get("from", ""))
             body = msg.get("body", "")
+            ymd = _msg_ymd(msg)
             if body.strip():
-                author_body_queues.setdefault(short.lower(), []).append(body)
+                author_msg_queues.setdefault(short.lower(), []).append((body, ymd))
 
     # Keep a per-author cursor so successive entries by the same author each
-    # get a different raw body message.
+    # get a different raw body and date.
     author_cursor: Dict[str, int] = {}
 
     result: List[Dict] = []
@@ -1655,11 +1872,14 @@ def _merge_monolithic_review_comments(
         inline = bool(rc.get("has_inline_review", False))
         tags = list(rc.get("tags_given") or [])
 
-        # Attach the next available raw body for this author
+        # Attach the next available raw body + date for this author
         author_key = author.lower()
-        bodies = author_body_queues.get(author_key, [])
+        msgs = author_msg_queues.get(author_key, [])
         cursor = author_cursor.get(author_key, 0)
-        raw_body = bodies[cursor] if cursor < len(bodies) else ""
+        if cursor < len(msgs):
+            raw_body, message_date = msgs[cursor]
+        else:
+            raw_body, message_date = "", ""
         author_cursor[author_key] = cursor + 1
 
         result.append({
@@ -1672,6 +1892,7 @@ def _merge_monolithic_review_comments(
             "tags_given": tags,
             "analysis_source": rc.get("analysis_source", "llm"),
             "raw_body": raw_body,
+            "message_date": message_date,
         })
 
     return result
@@ -1706,17 +1927,15 @@ def analyze_thread_llm(
         summary.analysis_source = "heuristic"
         return summary
 
-    # Single-participant threads (e.g. patch series with no replies): use
-    # the LLM only for patch summaries (small, chunked calls) and heuristic
-    # for everything else (sentiment, progress, review comments).  No point
-    # sending the full monolithic prompt when there's no discussion to analyze.
+    # Single-participant patch threads (e.g. patch series with no replies):
+    # use chunked LLM calls for the patch summary, then fall through to the
+    # normal per-reviewer LLM path below for any remaining messages.
+    # Non-patch single-participant threads also fall through to the per-reviewer
+    # path — heuristic is only used when LLM actually fails.
     participant_count = _count_participants_simple(thread_messages)
     if participant_count <= 1:
         is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
-        summary = analyze_thread(thread_messages, activity_item)
-
         if is_patch:
-            # Summarize each message in the series with its own small LLM call
             logger.info(
                 "Single-participant patch %s (%d msgs) — chunked patch summary",
                 activity_item.message_id, len(thread_messages),
@@ -1724,23 +1943,18 @@ def analyze_thread_llm(
             llm_summary = _summarize_patch_series_chunked(
                 thread_messages, activity_item, backend, cache, dump_dir,
             )
-            if llm_summary:
-                summary.patch_summary = llm_summary
-                summary.analysis_source = "llm"
-            else:
-                summary.analysis_source = "llm-fallback-heuristic"
+            if not llm_summary:
                 logger.warning(
-                    "All chunked patch summary calls failed for %s — keeping heuristic",
+                    "All chunked patch summary calls failed for %s — keeping heuristic patch summary",
                     activity_item.message_id,
                 )
+            # Fall through to per-reviewer analysis below (even with 1 participant,
+            # the author's own messages are worth summarising with LLM)
         else:
-            summary.analysis_source = "heuristic"
             logger.info(
-                "Single-participant non-patch %s — using heuristic only",
+                "Single-participant non-patch %s — proceeding with per-reviewer LLM analysis",
                 activity_item.message_id,
             )
-
-        return summary
 
     # Check cache first — key includes backend+model so different LLMs
     # don't share cached results.
@@ -1784,6 +1998,7 @@ def analyze_thread_llm(
                             "tags_given": rc.tags_given,
                             "raw_body": rc.raw_body,
                             "reply_to": rc.reply_to,
+                            "message_date": rc.message_date,
                         }
                         for rc in summary.review_comments
                     ],

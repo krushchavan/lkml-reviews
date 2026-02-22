@@ -37,6 +37,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+from build_index import build_index
+from build_reviews import build_all_reviews
+
 
 def _load_dotenv(env_path: Path = Path(".env")) -> None:
     """Load key=value pairs from a .env file into os.environ.
@@ -81,7 +84,10 @@ from llm_summarizer import (
     OllamaBackend,
     analyze_thread_llm,
 )
-from models import ActivityItem, ActivityType, DailyReport, Developer, DeveloperReport, LLMAnalysis
+from models import (
+    ActivityItem, ActivityType, ConversationSummary, DailyReport,
+    Developer, DeveloperReport, LLMAnalysis, ReviewComment, Sentiment,
+)
 from report_generator import extract_reviews_data, generate_html_report, message_id_to_slug
 from thread_analyzer import analyze_thread
 
@@ -269,6 +275,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    parser.add_argument(
+        "--rebuild-html",
+        action="store_true",
+        help=(
+            "Re-render HTML reports from the existing persisted review JSON files "
+            "without any web fetches or LLM calls. Useful after template or CSS "
+            "changes. Uses --date / --days to select which dates to rebuild."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -351,7 +367,7 @@ def process_developer(
             logger.warning("  %s", err_msg)
             report.errors.append(err_msg)
 
-    # Classify today's messages
+    # Classify messages for the report date
     def raw_fetcher(msg_id: str) -> str:
         return client.get_raw_message(msg_id)
 
@@ -382,9 +398,9 @@ def process_developer(
         date_str,
     )
 
-    # --- 14-day lookback: find recent patches with activity today ---
+    # --- 14-day lookback: find recent patches with activity on the report date ---
     today_patch_ids = {p.message_id for p in report.patches_submitted}
-    # Also collect timestamp-prefix keys from today's patches to avoid dupes
+    # Also collect timestamp-prefix keys from the report date's patches to avoid dupes
     today_prefix_keys = set()
     for p in report.patches_submitted:
         pfx = re.match(r"^(\d+\.\d+)", p.message_id)
@@ -394,7 +410,7 @@ def process_developer(
     # Compute lookback date range
     target_date_obj = datetime.strptime(date_str, "%Y%m%d")
     lookback_start = (target_date_obj - timedelta(days=lookback_days)).strftime("%Y%m%d")
-    # End date is the day before the report date (today's patches already captured)
+    # End date is the day before the report date (report date's patches already captured)
     lookback_end_obj = target_date_obj - timedelta(days=1)
     if lookback_end_obj < datetime.strptime(lookback_start, "%Y%m%d"):
         lookback_end = lookback_start
@@ -402,7 +418,7 @@ def process_developer(
         lookback_end = lookback_end_obj.strftime("%Y%m%d")
 
     recent_patch_entries = []
-    recent_seen_ids = set(seen_msg_ids)  # avoid dupes with today's messages
+    recent_seen_ids = set(seen_msg_ids)  # avoid dupes with report date's messages
 
     for email_addr in developer.all_emails():
         try:
@@ -414,7 +430,7 @@ def process_developer(
             for entry in patch_entries:
                 msg_id = entry.get("message_id", "")
                 if msg_id and msg_id not in recent_seen_ids:
-                    # Also skip if the series prefix matches a today patch
+                    # Also skip if the series prefix matches a report date patch
                     pfx = re.match(r"^(\d+\.\d+)", msg_id)
                     if pfx and pfx.group(1) in today_prefix_keys:
                         continue
@@ -430,7 +446,7 @@ def process_developer(
         except LKMLAPIError as e:
             logger.debug("  Lookback fetch failed for %s: %s", email_addr, e)
 
-    # Deduplicate recent patch series (same logic as today's patches)
+    # Deduplicate recent patch series (same logic as the report date's patches)
     if recent_patch_entries:
         # Convert to ActivityItems for deduplication, then check threads
         recent_items = []
@@ -454,10 +470,12 @@ def process_developer(
             ))
 
         recent_items = _deduplicate_patches(recent_items)
+        date_display = target_date_obj.strftime("%Y-%m-%d")
         logger.info(
-            "  %s: %d recent patch series to check for activity today",
+            "  %s: %d recent patch series to check for activity on %s",
             developer.name,
             len(recent_items),
+            date_display,
         )
 
         # For each recent patch, fetch thread and check for activity on report date
@@ -482,11 +500,12 @@ def process_developer(
 
         if ongoing_patches:
             logger.info(
-                "  %s: %d ongoing patches with activity today",
+                "  %s: %d ongoing patches with activity on %s",
                 developer.name,
                 len(ongoing_patches),
+                date_display,
             )
-            # Append ongoing patches after today's patches
+            # Append ongoing patches after the report date's patches
             report.patches_submitted.extend(ongoing_patches)
     else:
         thread_cache = {}
@@ -529,6 +548,134 @@ def process_developer(
                 item.conversation = item.llm_analyses[0].conversation
             else:
                 item.conversation = analyze_thread(thread_messages, item)
+
+    return report
+
+
+def _serialize_daily_report(report: "DailyReport", report_filename: str) -> dict:
+    """Serialize a DailyReport to a plain dict for JSON persistence.
+
+    Captures enough information to fully reconstruct the DailyReport for
+    --rebuild-html without any web fetches or LLM calls.
+    """
+    def _serialize_item(item: "ActivityItem") -> dict:
+        conv = item.conversation
+        rc_list = []
+        if conv:
+            for rc in conv.review_comments:
+                rc_list.append({
+                    "author": rc.author,
+                    "summary": rc.summary,
+                    "sentiment": rc.sentiment.value.upper(),
+                    "sentiment_signals": rc.sentiment_signals,
+                    "has_inline_review": rc.has_inline_review,
+                    "tags_given": rc.tags_given,
+                    "raw_body": rc.raw_body,
+                    "reply_to": rc.reply_to,
+                    "message_date": rc.message_date,
+                    "analysis_source": rc.analysis_source,
+                })
+        return {
+            "activity_type": item.activity_type.value,
+            "subject": item.subject,
+            "message_id": item.message_id,
+            "url": item.url,
+            "date": item.date,
+            "in_reply_to": item.in_reply_to,
+            "ack_type": item.ack_type,
+            "is_ongoing": item.is_ongoing,
+            "submitted_date": item.submitted_date,
+            "patch_summary": conv.patch_summary if conv else "",
+            "analysis_source": conv.analysis_source if conv else "heuristic",
+            "review_comments": rc_list,
+        }
+
+    dev_reports = []
+    for dr in report.developer_reports:
+        dev_reports.append({
+            "name": dr.developer.name,
+            "primary_email": dr.developer.primary_email,
+            "patches_submitted": [_serialize_item(i) for i in dr.patches_submitted],
+            "patches_reviewed": [_serialize_item(i) for i in dr.patches_reviewed],
+            "patches_acked": [_serialize_item(i) for i in dr.patches_acked],
+            "discussions_posted": [_serialize_item(i) for i in dr.discussions_posted],
+            "errors": dr.errors,
+        })
+
+    return {
+        "date": report.date,
+        "report_file": report_filename,
+        "llm_backends": report.llm_backends,
+        "generation_time_seconds": report.generation_time_seconds,
+        "developer_reports": dev_reports,
+    }
+
+
+def _load_daily_report(daily_json_path: Path) -> "DailyReport":
+    """Reconstruct a DailyReport from a persisted daily summary JSON file."""
+    data = json.loads(daily_json_path.read_text(encoding="utf-8"))
+
+    def _load_item(d: dict) -> "ActivityItem":
+        try:
+            act_type = ActivityType(d["activity_type"])
+        except (KeyError, ValueError):
+            act_type = ActivityType.PATCH_SUBMITTED
+
+        rc_list = []
+        for rc in d.get("review_comments", []):
+            try:
+                sentiment = Sentiment[rc.get("sentiment", "NEUTRAL").upper()]
+            except KeyError:
+                sentiment = Sentiment.NEUTRAL
+            rc_list.append(ReviewComment(
+                author=rc.get("author", ""),
+                summary=rc.get("summary", ""),
+                sentiment=sentiment,
+                sentiment_signals=rc.get("sentiment_signals", []),
+                has_inline_review=rc.get("has_inline_review", False),
+                tags_given=rc.get("tags_given", []),
+                raw_body=rc.get("raw_body", ""),
+                reply_to=rc.get("reply_to", ""),
+                message_date=rc.get("message_date", ""),
+                analysis_source=rc.get("analysis_source", "heuristic"),
+            ))
+
+        conv = ConversationSummary(
+            review_comments=rc_list,
+            patch_summary=d.get("patch_summary", ""),
+            analysis_source=d.get("analysis_source", "heuristic"),
+        )
+
+        return ActivityItem(
+            activity_type=act_type,
+            subject=d.get("subject", ""),
+            message_id=d.get("message_id", ""),
+            url=d.get("url", ""),
+            date=d.get("date", ""),
+            in_reply_to=d.get("in_reply_to"),
+            ack_type=d.get("ack_type"),
+            is_ongoing=d.get("is_ongoing", False),
+            submitted_date=d.get("submitted_date"),
+            conversation=conv,
+        )
+
+    report = DailyReport(
+        date=data["date"],
+        llm_backends=[tuple(b) for b in data.get("llm_backends", [])],
+        generation_time_seconds=data.get("generation_time_seconds", 0.0),
+    )
+
+    for dr_data in data.get("developer_reports", []):
+        dev = Developer(name=dr_data["name"], primary_email=dr_data.get("primary_email", ""))
+        dr = DeveloperReport(developer=dev, errors=dr_data.get("errors", []))
+        dr.patches_submitted = [_load_item(i) for i in dr_data.get("patches_submitted", [])]
+        dr.patches_reviewed = [_load_item(i) for i in dr_data.get("patches_reviewed", [])]
+        dr.patches_acked = [_load_item(i) for i in dr_data.get("patches_acked", [])]
+        dr.discussions_posted = [_load_item(i) for i in dr_data.get("discussions_posted", [])]
+        report.developer_reports.append(dr)
+        report.total_patches += len(dr.patches_submitted)
+        report.total_reviews += len(dr.patches_reviewed)
+        report.total_acks += len(dr.patches_acked)
 
     return report
 
@@ -640,18 +787,53 @@ def generate_single_report(
             else:
                 existing = {}
 
-            # Preserve existing dates, update/add current date
+            # Preserve existing dates, update/add entries bucketed by message_date.
+            # Each review comment carries a message_date (the actual date the email
+            # was sent).  We group comments by that date so the review detail page
+            # can show accurate date chips ("Dan Carpenter — 2026-02-10") instead of
+            # incorrectly stamping all comments with the report-run date.
+            # Falls back to the report date for any comment without a message_date.
             dates = existing.get("dates", {})
-            date_entry = {
-                "report_file": item_data["report_file"],
-                "developer": item_data["developer"],
-                "reviews": item_data["reviews"],
-            }
-            if item_data.get("analysis_source"):
-                date_entry["analysis_source"] = item_data["analysis_source"]
-            if item_data.get("patch_summary"):
-                date_entry["patch_summary"] = item_data["patch_summary"]
-            dates[item_data["date"]] = date_entry
+            report_date = item_data["date"]
+            report_file = item_data["report_file"]
+
+            # Group reviews by their individual message_date
+            reviews_by_date: dict[str, list] = {}
+            for review in item_data["reviews"]:
+                bucket = review.get("message_date") or report_date
+                reviews_by_date.setdefault(bucket, []).append(review)
+
+            # Merge each date bucket into the JSON, preserving existing dates
+            for bucket_date, bucket_reviews in reviews_by_date.items():
+                # Only update the report_file link for the bucket that matches
+                # the current report date (so older buckets keep their original link)
+                link = report_file if bucket_date == report_date else dates.get(
+                    bucket_date, {}
+                ).get("report_file", report_file)
+
+                date_entry = {
+                    "report_file": link,
+                    "developer": item_data["developer"],
+                    "reviews": bucket_reviews,
+                }
+                if item_data.get("analysis_source"):
+                    date_entry["analysis_source"] = item_data["analysis_source"]
+                if item_data.get("patch_summary"):
+                    date_entry["patch_summary"] = item_data["patch_summary"]
+                dates[bucket_date] = date_entry
+
+            # Always ensure the report-run date entry exists (for report_file link
+            # and patch_summary), even if no comments fell on that exact date.
+            if report_date not in dates:
+                dates[report_date] = {
+                    "report_file": report_file,
+                    "developer": item_data["developer"],
+                    "reviews": [],
+                }
+                if item_data.get("analysis_source"):
+                    dates[report_date]["analysis_source"] = item_data["analysis_source"]
+                if item_data.get("patch_summary"):
+                    dates[report_date]["patch_summary"] = item_data["patch_summary"]
 
             merged = {
                 "thread_id": msg_id,
@@ -666,6 +848,16 @@ def generate_single_report(
 
         if reviews_data:
             logger.info("Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir)
+
+        # --- Save daily activity summary for --rebuild-html ---
+        daily_dir = output_dir / "daily"
+        daily_dir.mkdir(parents=True, exist_ok=True)
+        daily_json_path = daily_dir / f"{date_display}.json"
+        daily_json_path.write_text(
+            json.dumps(_serialize_daily_report(daily_report, output_path.name), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.debug("Saved daily summary: %s", daily_json_path)
 
         # Generate HTML report with review links and log filename
         html_content = generate_html_report(
@@ -1027,6 +1219,75 @@ def publish_to_github(
     return True
 
 
+def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None:
+    """Re-render HTML reports from persisted daily summary JSON files.
+
+    Reads reports/daily/{date}.json (saved during the original run) to
+    reconstruct a full DailyReport, then re-generates the HTML report,
+    review pages, and index — without any web fetches or LLM calls.
+    """
+    reports_dir = Path(args.output_dir)
+    logs_dir = Path(args.logs_dir)
+    daily_dir = reports_dir / "daily"
+
+    for target_date in target_dates:
+        date_str = target_date.strftime("%Y-%m-%d")
+        daily_json = daily_dir / f"{date_str}.json"
+
+        if not daily_json.exists():
+            logger.warning(
+                "No daily summary found for %s (%s) — skipping. "
+                "Run without --rebuild-html first to generate the summary.",
+                date_str, daily_json,
+            )
+            continue
+
+        logger.info("Rebuilding HTML for %s from %s...", date_str, daily_json)
+        try:
+            daily_report = _load_daily_report(daily_json)
+        except Exception as e:
+            logger.error("Failed to load daily summary for %s: %s", date_str, e)
+            continue
+
+        # Determine output path from the saved report_file name
+        saved_data = json.loads(daily_json.read_text(encoding="utf-8"))
+        report_filename = saved_data.get("report_file", f"{date_str}.html")
+        output_path = reports_dir / report_filename
+
+        # Build review_links for all activity types
+        all_items = [
+            item
+            for dr in daily_report.developer_reports
+            for item in (
+                dr.patches_submitted + dr.patches_reviewed
+                + dr.patches_acked + dr.discussions_posted
+            )
+            if item.message_id
+        ]
+        review_links = {
+            item.message_id: message_id_to_slug(item.message_id)
+            for item in all_items
+        }
+
+        # Re-render the daily HTML report
+        html_content = generate_html_report(
+            daily_report,
+            review_links=review_links or None,
+            log_filename=None,
+        )
+        output_path.write_text(html_content, encoding="utf-8")
+        logger.info("Rebuilt report: %s", output_path)
+
+        # Rebuild review pages and index
+        logger.info("Rebuilding review pages...")
+        build_all_reviews(reports_dir)
+
+        logger.info("Rebuilding index...")
+        index_html = build_index(reports_dir, logs_dir)
+        (reports_dir / "index.html").write_text(index_html, encoding="utf-8")
+        logger.info("Index updated.")
+
+
 def main():
     args = parse_args()
 
@@ -1097,6 +1358,11 @@ def main():
             target_dates[-1].strftime("%Y-%m-%d"),
         )
 
+    # --- Rebuild-HTML mode (no web fetches or LLM calls) ---
+    if args.rebuild_html:
+        rebuild_html_from_json(args, target_dates)
+        return
+
     # Load developers
     developers = load_developers(args.people)
     if not developers:
@@ -1166,7 +1432,32 @@ def main():
             logger.error("Failed to initialize LLM backend: %s", e)
             logger.info("Falling back to heuristic analysis.")
 
-    # Generate a report for each date
+    # Resolve publish settings once (used inside the per-day loop)
+    reports_dir = Path(args.output_dir)
+    logs_dir = Path(args.logs_dir)
+    publish = args.publish_github
+    publish_repo = ""
+    publish_token = ""
+    publish_branch = ""
+    if publish:
+        publish_repo = args.github_repo or os.environ.get("GITHUB_REPO", "")
+        if not publish_repo:
+            logger.error(
+                "GitHub publish: no repository specified. "
+                "Use --github-repo owner/repo or set the GITHUB_REPO environment variable."
+            )
+            sys.exit(1)
+        publish_token = args.github_token or os.environ.get("GITHUB_TOKEN", "")
+        if not publish_token:
+            logger.warning(
+                "GitHub publish: no token provided. Falling back to git credential "
+                "helper. Set --github-token or GITHUB_TOKEN for Docker/CI environments."
+            )
+        publish_branch = args.github_branch
+        if publish_branch == "main":  # argparse default — check if env var overrides it
+            publish_branch = os.environ.get("GITHUB_BRANCH", publish_branch)
+
+    # Generate a report for each date, rebuilding index + publishing after each one
     total_start = time.time()
     for day_num, target_date in enumerate(target_dates, 1):
         if num_days > 1:
@@ -1176,6 +1467,23 @@ def main():
             )
         generate_single_report(args, target_date, developers, client, llm_backends)
 
+        # --- Rebuild review HTML pages and index after every day ---
+        logger.info("Rebuilding review pages...")
+        build_all_reviews(reports_dir)
+
+        logger.info("Rebuilding index...")
+        index_html = build_index(reports_dir, logs_dir)
+        index_path = reports_dir / "index.html"
+        index_path.write_text(index_html, encoding="utf-8")
+        logger.info("Index updated: %s", index_path)
+
+        # --- Publish to GitHub after every day (if requested) ---
+        if publish:
+            ok = publish_to_github(reports_dir, publish_repo, branch=publish_branch, token=publish_token)
+            if not ok:
+                logger.error("GitHub publish: failed for %s — see errors above.", target_date.strftime("%Y-%m-%d"))
+                # Don't exit — continue processing remaining days
+
     if num_days > 1:
         total_elapsed = time.time() - total_start
         logger.info(
@@ -1184,35 +1492,16 @@ def main():
         )
 
     # --- Automatic purge (unless --no-purge) ---
+    # Purge runs once at the end: no benefit to purging after every day, and
+    # doing it mid-run could remove data still needed for subsequent days.
     if not args.no_purge:
-        reports_dir = Path(args.output_dir)
-        logs_dir = Path(args.logs_dir)
         purge_old_files(reports_dir, logs_dir, args.retention_days)
-
-    # --- GitHub publishing (if requested) ---
-    if args.publish_github:
-        repo = args.github_repo or os.environ.get("GITHUB_REPO", "")
-        if not repo:
-            logger.error(
-                "GitHub publish: no repository specified. "
-                "Use --github-repo owner/repo or set the GITHUB_REPO environment variable."
-            )
-            sys.exit(1)
-        token = args.github_token or os.environ.get("GITHUB_TOKEN", "")
-        if not token:
-            logger.warning(
-                "GitHub publish: no token provided. Falling back to git credential "
-                "helper. Set --github-token or GITHUB_TOKEN for Docker/CI environments."
-            )
-        # Branch: CLI flag > GITHUB_BRANCH env var > argparse default ("main")
-        branch = args.github_branch
-        if branch == "main":  # argparse default — check if env var overrides it
-            branch = os.environ.get("GITHUB_BRANCH", branch)
-        reports_dir = Path(args.output_dir)
-        ok = publish_to_github(reports_dir, repo, branch=branch, token=token)
-        if not ok:
-            logger.error("GitHub publish: failed — see errors above.")
-            sys.exit(1)
+        # Rebuild index once more after purge to reflect any removed entries
+        logger.info("Rebuilding index after purge...")
+        index_html = build_index(reports_dir, logs_dir)
+        index_path.write_text(index_html, encoding="utf-8")
+        if publish:
+            publish_to_github(reports_dir, publish_repo, branch=publish_branch, token=publish_token)
 
 
 if __name__ == "__main__":

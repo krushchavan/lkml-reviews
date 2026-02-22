@@ -769,89 +769,57 @@ def _extract_review_comments(
     if email_match:
         root_email = email_match.group(1).lower()
 
-    # Group messages by author email
-    author_messages: Dict[str, List[Dict]] = {}
-    author_names: Dict[str, str] = {}
+    # Produce one ReviewComment per individual message (skipping root).
+    # Each message carries its own date, author, and body — no grouping needed.
+    from email.utils import parsedate as _parsedate
+    import time as _time
+
+    def _msg_ymd(msg: Dict) -> str:
+        """Return YYYY-MM-DD for a message's Date header, or '' on failure."""
+        raw = msg.get("date", "")
+        if not raw:
+            return ""
+        try:
+            pd = _parsedate(raw)
+            return _time.strftime("%Y-%m-%d", pd) if pd else ""
+        except Exception:
+            return ""
+
+    comments: List[ReviewComment] = []
 
     for msg in messages[1:]:  # Skip root message
         from_field = msg.get("from", "")
         msg_email_match = re.search(r"<([^>]+)>", from_field.lower())
         msg_email = msg_email_match.group(1) if msg_email_match else from_field.strip().lower()
+        author_name = _extract_author_short(from_field)
+        is_patch_author = (msg_email == root_email)
+        ymd = _msg_ymd(msg)
 
-        author_messages.setdefault(msg_email, []).append(msg)
-        if msg_email not in author_names:
-            author_names[msg_email] = _extract_author_short(from_field)
+        body = msg.get("body", "")
+        tags = _extract_tags_from_body(body)
 
-    comments: List[ReviewComment] = []
-
-    for email, msgs in author_messages.items():
-        author_name = author_names[email]
-        is_patch_author = (email == root_email)
-
-        # Combine all non-trivial messages from this author
-        all_bodies: List[str] = []
-        has_inline = False
-        all_tags: List[str] = []
-
-        for msg in msgs:
-            body = msg.get("body", "")
-            if _is_trivial_message(body):
-                # Still capture tags from trivial messages
-                all_tags.extend(_extract_tags_from_body(body))
-                continue
-            all_bodies.append(body)
-            if _has_inline_review(body):
-                has_inline = True
-            all_tags.extend(_extract_tags_from_body(body))
-
-        if not all_bodies and not all_tags:
+        if _is_trivial_message(body) and not tags:
             continue
 
-        # Preserve raw body text (quote-stripped but not truncated)
-        raw_body = "\n\n---\n\n".join(all_bodies)
+        has_inline = _has_inline_review(body)
 
-        # Build the comment summary from all their messages.
-        # Budget scales with input size — larger comments get longer summaries.
-        total_body_chars = sum(len(b) for b in all_bodies)
-        comment_parts: List[str] = []
-        for i, body in enumerate(all_bodies):
+        # Build summary from this single message body
+        if not _is_trivial_message(body):
             budget = max(200, min(800, len(body) // 3))
-            extracted = _extract_comment_body(body, max_chars=budget)
-            if extracted:
-                comment_parts.append(extracted)
-
-        # Join all their comments — cap scales with total input size
-        if comment_parts:
-            combined_cap = max(300, min(2000, total_body_chars // 3))
-            combined = " ".join(comment_parts)
-            if len(combined) > combined_cap:
-                truncated = combined[:combined_cap]
-                last_break = max(
-                    truncated.rfind("."),
-                    truncated.rfind("?"),
-                    truncated.rfind("!"),
-                )
-                if last_break > combined_cap // 2:
-                    combined = truncated[:last_break + 1]
-                else:
-                    combined = truncated.rsplit(" ", 1)[0] + "..."
-            summary = combined
+            summary = _extract_comment_body(body, max_chars=budget) or ""
         else:
-            # Only had tags, no substantive content
-            if all_tags:
-                unique_tags = list(dict.fromkeys(all_tags))  # preserve order, dedup
+            summary = ""
+
+        if not summary:
+            if tags:
+                unique_tags = list(dict.fromkeys(tags))
                 summary = f"Gave {', '.join(unique_tags)}"
             else:
                 continue
 
-        # Per-reviewer sentiment
-        all_text = " ".join(all_bodies)
-        sentiment, signals = _determine_message_sentiment(all_text)
+        unique_tags = list(dict.fromkeys(tags))
+        sentiment, signals = _determine_message_sentiment(body)
 
-        # Deduplicate tags
-        unique_tags = list(dict.fromkeys(all_tags))
-
-        # Label for patch author replies
         if is_patch_author:
             author_name = f"{author_name} (author)"
 
@@ -863,13 +831,14 @@ def _extract_review_comments(
             has_inline_review=has_inline,
             tags_given=unique_tags,
             analysis_source="heuristic",
-            raw_body=raw_body,
+            raw_body=body,
+            message_date=ymd,
         ))
 
-    # Sort: patch author last, then by number of messages (most active first)
+    # Sort: by date ascending, patch author last within each date
     def sort_key(c: ReviewComment) -> tuple:
         is_author = c.author.endswith("(author)")
-        return (is_author, -len(c.summary))
+        return (c.message_date, is_author)
 
     comments.sort(key=sort_key)
     return comments[:max_comments]

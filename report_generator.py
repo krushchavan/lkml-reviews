@@ -349,8 +349,9 @@ def _render_developer_section(
         + len(dev_report.discussions_posted)
     )
 
+    anchor = _name_to_anchor(dev_report.developer.name)
     parts = []
-    parts.append('<div class="developer-section">')
+    parts.append(f'<div class="developer-section" id="{anchor}">')
     parts.append(f'<div class="developer-header">')
     parts.append(f'<h3>{_esc(dev_report.developer.name)}</h3>')
     if total == 0:
@@ -387,18 +388,12 @@ def _render_developer_section(
     return "\n".join(parts)
 
 
-def _build_contributor_tooltip(names_with_counts: list[tuple[str, int]]) -> str:
-    """Build an HTML tooltip listing contributors and their counts."""
-    if not names_with_counts:
-        return ""
-    lines = []
-    for name, count in sorted(names_with_counts, key=lambda x: -x[1]):
-        lines.append(f'<div class="tooltip-row"><span>{_esc(name)}</span><span class="tooltip-count">{count}</span></div>')
-    return (
-        '<div class="stat-tooltip">'
-        + "\n".join(lines)
-        + "</div>"
-    )
+def _name_to_anchor(name: str) -> str:
+    """Convert a developer name to a section anchor id."""
+    slug = name.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    return "dev-" + slug.strip("-")
+
 
 
 def _render_statistics(report: DailyReport) -> str:
@@ -412,73 +407,80 @@ def _render_statistics(report: DailyReport) -> str:
 
     total_discussions = sum(len(dr.discussions_posted) for dr in report.developer_reports)
 
-    # Build per-card contributor lists
-    patch_contributors = [
-        (dr.developer.name, len(dr.patches_submitted))
-        for dr in report.developer_reports
-        if dr.patches_submitted
-    ]
-    discussion_contributors = [
-        (dr.developer.name, len(dr.discussions_posted))
-        for dr in report.developer_reports
-        if dr.discussions_posted
-    ]
-    review_contributors = [
-        (dr.developer.name, len(dr.patches_reviewed))
-        for dr in report.developer_reports
-        if dr.patches_reviewed
-    ]
-    ack_contributors = [
-        (dr.developer.name, len(dr.patches_acked))
-        for dr in report.developer_reports
-        if dr.patches_acked
-    ]
-    active_names = [
-        (dr.developer.name, len(dr.patches_submitted) + len(dr.patches_reviewed)
-         + len(dr.patches_acked) + len(dr.discussions_posted))
-        for dr in report.developer_reports
-        if dr.patches_submitted or dr.patches_reviewed or dr.patches_acked
-            or dr.discussions_posted
-    ]
-
-    patch_tooltip = _build_contributor_tooltip(patch_contributors)
-    discussion_tooltip = _build_contributor_tooltip(discussion_contributors)
-    review_tooltip = _build_contributor_tooltip(review_contributors)
-    ack_tooltip = _build_contributor_tooltip(ack_contributors)
-    active_tooltip = _build_contributor_tooltip(active_names)
-
     discussion_card = ""
     if total_discussions:
         discussion_card = f"""
         <div class="stat-card">
             <div class="stat-number">{total_discussions}</div>
             <div class="stat-label">Discussions / RFCs</div>
-            {discussion_tooltip}
         </div>"""
+
+    # --- Permanent contributor table ---
+    # Collect all active developers with their per-category counts
+    has_discussions = total_discussions > 0
+    contrib_rows = []
+    for dr in sorted(report.developer_reports,
+                     key=lambda r: -(len(r.patches_submitted) + len(r.patches_reviewed)
+                                     + len(r.patches_acked) + len(r.discussions_posted))):
+        p = len(dr.patches_submitted)
+        rv = len(dr.patches_reviewed)
+        ack = len(dr.patches_acked)
+        disc = len(dr.discussions_posted)
+        if p == 0 and rv == 0 and ack == 0 and disc == 0:
+            continue
+        anchor = _name_to_anchor(dr.developer.name)
+
+        def _cell(n: int) -> str:
+            if n == 0:
+                return '<td class="num zero">&mdash;</td>'
+            return f'<td class="num">{n}</td>'
+
+        disc_cell = _cell(disc) if has_discussions else ""
+        contrib_rows.append(
+            f'<tr>'
+            f'<td><a href="#{anchor}">{_esc(dr.developer.name)}</a></td>'
+            f'{_cell(p)}{disc_cell}{_cell(rv)}{_cell(ack)}'
+            f'</tr>'
+        )
+
+    disc_th = '<th class="num">Discussions</th>' if has_discussions else ""
+    contrib_table = ""
+    if contrib_rows:
+        contrib_table = f"""
+    <div class="contributors-section">
+        <h3>Contributors</h3>
+        <table class="contributors-table">
+            <thead><tr>
+                <th>Developer</th>
+                <th class="num">Patches</th>
+                {disc_th}
+                <th class="num">Reviews</th>
+                <th class="num">Acks</th>
+            </tr></thead>
+            <tbody>{"".join(contrib_rows)}</tbody>
+        </table>
+    </div>"""
 
     return f"""
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-number">{report.total_patches}</div>
             <div class="stat-label">Patches Submitted</div>
-            {patch_tooltip}
         </div>{discussion_card}
         <div class="stat-card">
             <div class="stat-number">{report.total_reviews}</div>
             <div class="stat-label">Reviews Given</div>
-            {review_tooltip}
         </div>
         <div class="stat-card">
             <div class="stat-number">{report.total_acks}</div>
             <div class="stat-label">Acks Given</div>
-            {ack_tooltip}
         </div>
         <div class="stat-card">
             <div class="stat-number">{active_devs}/{total_devs}</div>
             <div class="stat-label">Active Developers</div>
-            {active_tooltip}
         </div>
     </div>
+    {contrib_table}
     """
 
 
@@ -521,6 +523,7 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                     "analysis_source": rc.analysis_source,
                     "raw_body": rc.raw_body,
                     "reply_to": rc.reply_to,
+                    "message_date": rc.message_date,
                 })
             results.append({
                 "message_id": item.message_id,
@@ -621,50 +624,67 @@ def generate_html_report(
             transform: translateY(-3px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }}
-        .stat-tooltip {{
-            display: none;
-            position: absolute;
-            top: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1a1a1a;
-            color: #f0f0f0;
+        .contributors-section {{
+            margin-bottom: 32px;
+        }}
+        .contributors-section h3 {{
+            font-size: 0.95em;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }}
+        .contributors-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88em;
+            background: #fff;
             border-radius: 8px;
-            padding: 10px 14px;
-            min-width: 200px;
-            max-width: 280px;
-            z-index: 100;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .contributors-table th {{
+            background: #f4f6f8;
+            color: #555;
+            font-weight: 600;
             text-align: left;
-            font-size: 0.82em;
-            line-height: 1.5;
+            padding: 8px 14px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
         }}
-        .stat-tooltip::before {{
-            content: "";
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 6px solid transparent;
-            border-bottom-color: #1a1a1a;
+        .contributors-table th.num {{
+            text-align: center;
         }}
-        .stat-card:hover .stat-tooltip {{
-            display: block;
+        .contributors-table td {{
+            padding: 7px 14px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
         }}
-        .tooltip-row {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+        .contributors-table td.num {{
+            text-align: center;
+            font-weight: 700;
+            color: #2c3e50;
         }}
-        .tooltip-row:last-child {{
+        .contributors-table td.zero {{
+            color: #ccc;
+            font-weight: normal;
+        }}
+        .contributors-table tr:last-child td {{
             border-bottom: none;
         }}
-        .tooltip-count {{
-            font-weight: 700;
-            margin-left: 16px;
-            color: #7ec8e3;
+        .contributors-table tr:hover td {{
+            background: #f9f9f9;
+        }}
+        .contributors-table a {{
+            color: #2980b9;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .contributors-table a:hover {{
+            text-decoration: underline;
         }}
         .stat-number {{
             font-size: 2em;

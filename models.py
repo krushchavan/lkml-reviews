@@ -55,6 +55,7 @@ class ReviewComment:
     analysis_source: str = "heuristic"  # "heuristic" or "llm"
     raw_body: str = ""                  # Original comment text (quote-stripped, multi-msg joined)
     reply_to: str = ""                  # Short name of who this comment is replying to (if known)
+    message_date: str = ""              # YYYY-MM-DD of earliest message from this reviewer
 
 
 @dataclass

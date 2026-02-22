@@ -124,22 +124,27 @@ def _build_run_history_html(logs_dir: Path) -> str:
     rows_html = "\n            ".join(rows)
 
     return f"""
-    <h2 class="section-title">Run History (Last 14 Days)</h2>
-    <table class="history-table">
-        <thead>
-            <tr>
-                <th>Timestamp</th>
-                <th>Report Date</th>
-                <th>Status</th>
-                <th>Duration</th>
-                <th>Activity</th>
-                <th>Log</th>
-            </tr>
-        </thead>
-        <tbody>
-            {rows_html}
-        </tbody>
-    </table>"""
+    <details class="history-details">
+        <summary class="history-summary">
+            <span class="history-summary-title">Run History (Last 14 Days)</span>
+            <span class="history-summary-hint">click to expand</span>
+        </summary>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Report Date</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Activity</th>
+                    <th>Log</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </details>"""
 
 
 def build_index(reports_dir: Path, logs_dir: Path) -> str:
@@ -360,14 +365,43 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         .reviews-link a:hover {{
             text-decoration: underline;
         }}
-        .section-title {{
-            font-size: 1.2em;
-            color: #1a1a1a;
+        .history-details {{
             margin-top: 32px;
+        }}
+        .history-summary {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            list-style: none;
+            user-select: none;
             margin-bottom: 12px;
         }}
+        .history-summary::-webkit-details-marker {{ display: none; }}
+        .history-summary::before {{
+            content: "▶";
+            font-size: 0.75em;
+            color: #888;
+            transition: transform 0.15s ease;
+        }}
+        .history-details[open] .history-summary::before {{
+            transform: rotate(90deg);
+        }}
+        .history-summary-title {{
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #1a1a1a;
+        }}
+        .history-summary-hint {{
+            font-size: 0.8em;
+            color: #aaa;
+            font-style: italic;
+        }}
+        .history-details[open] .history-summary-hint {{
+            display: none;
+        }}
         .history-table {{
-            margin-top: 8px;
+            margin-top: 0;
         }}
         .history-table td {{
             font-size: 0.85em;

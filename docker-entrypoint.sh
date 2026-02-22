@@ -73,26 +73,11 @@ if [ -n "$CRON_SCHEDULE" ]; then
     # Add PATH so python is found
     echo "PATH=$PATH" >> "$ENV_FILE"
 
-    # Build the post-report commands (index + review pages + optional GitHub publish)
-    INDEX_CMD="cd /app && python build_index.py --reports-dir /app/reports --logs-dir ${LOG_DIR}"
-    REVIEWS_CMD="cd /app && python build_reviews.py --reports-dir /app/reports"
-    PUBLISH_CMD=""
-    if [ -n "$GITHUB_REPO" ] && [ -n "$GITHUB_TOKEN" ]; then
-        PUBLISH_CMD="cd /app && python generate_report.py --publish-only --logs-dir ${LOG_DIR}"
-    fi
-    if [ -n "$RUN_AS" ]; then
-        INDEX_CMD="su -s /bin/bash $RUN_AS -c '$INDEX_CMD'"
-        REVIEWS_CMD="su -s /bin/bash $RUN_AS -c '$REVIEWS_CMD'"
-        [ -n "$PUBLISH_CMD" ] && PUBLISH_CMD="su -s /bin/bash $RUN_AS -c '$PUBLISH_CMD'"
-    fi
-
     # Write crontab entry
     # Per-report logs are created by Python; stdout goes to Docker logs via PID 1
-    # After report generation, rebuild review pages, index page, then publish to GitHub
-    CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && $REPORT_CMD >> /proc/1/fd/1 2>&1 && $REVIEWS_CMD >> /proc/1/fd/1 2>&1 && $INDEX_CMD >> /proc/1/fd/1 2>&1"
-    if [ -n "$PUBLISH_CMD" ]; then
-        CRON_LINE="$CRON_LINE && $PUBLISH_CMD >> /proc/1/fd/1 2>&1"
-    fi
+    # generate_report.py now rebuilds review pages, index, and publishes to GitHub
+    # after every day processed, so no separate post-run steps are needed here.
+    CRON_LINE="$CRON_SCHEDULE set -a && . /app/.env.cron && $REPORT_CMD >> /proc/1/fd/1 2>&1"
     echo "$CRON_LINE" | crontab -
 
     echo "[entrypoint] Cron job installed. Waiting for schedule..."
@@ -100,17 +85,10 @@ if [ -n "$CRON_SCHEDULE" ]; then
     echo "[entrypoint] Per-report logs written to: $LOG_DIR"
 
     # Run an initial report immediately if requested
+    # generate_report.py handles review pages, index rebuild, and GitHub publish per-day.
     if [ "$RUN_ON_STARTUP" = "true" ]; then
         echo "[entrypoint] RUN_ON_STARTUP=true, running initial report..."
         run_cmd "cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} ${REPORT_ARGS:-}" 2>&1
-        echo "[entrypoint] Building review pages..."
-        run_cmd "cd /app && python build_reviews.py --reports-dir /app/reports"
-        echo "[entrypoint] Rebuilding index page..."
-        run_cmd "cd /app && python build_index.py --reports-dir /app/reports --logs-dir ${LOG_DIR}"
-        if [ -n "$GITHUB_REPO" ] && [ -n "$GITHUB_TOKEN" ]; then
-            echo "[entrypoint] Publishing to GitHub..."
-            run_cmd "cd /app && python generate_report.py --publish-only --logs-dir ${LOG_DIR}"
-        fi
     fi
 
     # Start cron in foreground (cron itself must run as root)
@@ -119,14 +97,6 @@ else
     echo "[entrypoint] On-demand mode"
     echo "[entrypoint] Per-report logs written to: $LOG_DIR"
     # Pass all arguments through to generate_report.py (Python creates per-report logs)
+    # generate_report.py handles review pages, index rebuild, and GitHub publish per-day.
     run_cmd "cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} $*" 2>&1
-    # Build review pages and rebuild the index page
-    echo "[entrypoint] Building review pages..."
-    run_cmd "cd /app && python build_reviews.py --reports-dir /app/reports"
-    echo "[entrypoint] Rebuilding index page..."
-    run_cmd "cd /app && python build_index.py --reports-dir /app/reports --logs-dir ${LOG_DIR}"
-    if [ -n "$GITHUB_REPO" ] && [ -n "$GITHUB_TOKEN" ]; then
-        echo "[entrypoint] Publishing to GitHub..."
-        run_cmd "cd /app && python generate_report.py --publish-only --logs-dir ${LOG_DIR}"
-    fi
 fi
