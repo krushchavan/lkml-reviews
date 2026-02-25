@@ -13,7 +13,9 @@ import html
 import json
 import os
 import re
+import time
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -69,6 +71,56 @@ def _match_log(report_filename: str, log_files: set[str], logs_by_date: dict[str
         return logs_by_date[date][0]
 
     return None
+
+
+def _build_date_tooltip(reports_dir: Path, date: str) -> str:
+    """Build a hover tooltip showing active contributors for a date.
+
+    Reads reports/daily/{date}.json. Returns empty string if not available.
+    """
+    daily_json = reports_dir / "daily" / f"{date}.json"
+    if not daily_json.exists():
+        return ""
+    try:
+        data = json.loads(daily_json.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+    rows = []
+    for dr in data.get("developer_reports", []):
+        p  = len(dr.get("patches_submitted", []))
+        rv = len(dr.get("patches_reviewed", []))
+        ak = len(dr.get("patches_acked", []))
+        di = len(dr.get("discussions_posted", []))
+        if p == 0 and rv == 0 and ak == 0 and di == 0:
+            continue
+        parts = []
+        if p:  parts.append(f"{p} {'Patch' if p == 1 else 'Patches'}")
+        if rv: parts.append(f"{rv} {'Review' if rv == 1 else 'Reviews'}")
+        if ak: parts.append(f"{ak} {'Ack' if ak == 1 else 'Acks'}")
+        if di: parts.append(f"{di} {'Discussion' if di == 1 else 'Discussions'}")
+        badge = ", ".join(parts)
+        rows.append(
+            f'<tr>'
+            f'<td class="tt-name">{html.escape(dr["name"])}</td>'
+            f'<td class="tt-badge">{html.escape(badge)}</td>'
+            f'</tr>'
+        )
+
+    if not rows:
+        return ""
+
+    return (
+        '<div class="date-tooltip">'
+        '<table class="tt-table">'
+        '<thead><tr>'
+        '<th>Developer</th>'
+        '<th>Activity</th>'
+        '</tr></thead>'
+        '<tbody>' + "".join(rows) + '</tbody>'
+        '</table>'
+        '</div>'
+    )
 
 
 def _build_run_history_html(logs_dir: Path) -> str:
@@ -147,6 +199,59 @@ def _build_run_history_html(logs_dir: Path) -> str:
     </details>"""
 
 
+def _infer_report_status(reports_dir: Path, logs_dir: Path, date_str: str) -> dict:
+    """Determine whether a report date is in-progress or complete.
+
+    Returns a dict with keys:
+      - ``status``:       "complete" or "in_progress"
+      - ``last_updated``: human-readable UTC timestamp string, or "" if unknown
+
+    Priority:
+    1. ``status`` / ``last_updated`` fields in reports/daily/{date}.json  — written by new runs
+    2. Last log file for that date — search for the completion marker logged by
+       generate_single_report ("Report generation complete: {date}")
+       Falls back to "in_progress" only if the log is less than 3 hours old
+       (guards against showing a stale badge for a crashed run)
+    3. Default: "complete"
+    """
+    # 1. Check daily JSON status field
+    daily_json = reports_dir / "daily" / f"{date_str}.json"
+    if daily_json.exists():
+        try:
+            data = json.loads(daily_json.read_text(encoding="utf-8"))
+            if "status" in data:
+                return {
+                    "status": data["status"],
+                    "last_updated": data.get("last_updated", ""),
+                }
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # 2. Check last log file for completion marker
+    if logs_dir.exists():
+        log_files = sorted(logs_dir.glob(f"{date_str}_*.log"))
+        if log_files:
+            last_log = log_files[-1]
+            try:
+                text = last_log.read_text(encoding="utf-8", errors="replace")
+                if f"Report generation complete: {date_str}" in text:
+                    return {"status": "complete", "last_updated": ""}
+                # Log exists but no completion marker — flag as in_progress only
+                # if the log was modified recently (< 3 hours), to avoid a
+                # permanent badge for a crashed run
+                age_hours = (time.time() - last_log.stat().st_mtime) / 3600
+                if age_hours < 3:
+                    mtime_str = datetime.fromtimestamp(
+                        last_log.stat().st_mtime, tz=timezone.utc
+                    ).strftime("%Y-%m-%d %H:%M UTC")
+                    return {"status": "in_progress", "last_updated": mtime_str}
+            except OSError:
+                pass
+
+    # 3. Default: assume complete
+    return {"status": "complete", "last_updated": ""}
+
+
 def build_index(reports_dir: Path, logs_dir: Path) -> str:
     """Generate index.html content."""
     # Collect all log filenames into a set for O(1) lookup
@@ -172,11 +277,6 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             if date:
                 reports_by_date[date].append(f.name)
 
-    # Check if reviews/ subdir exists for the "Review Comments" link
-    has_reviews = (reports_dir / "reviews").exists() and any(
-        (reports_dir / "reviews").glob("*.html")
-    )
-
     # All dates, newest first
     all_dates = sorted(reports_by_date.keys(), reverse=True)
 
@@ -185,9 +285,24 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
 
     # Build table rows: one row per report, date cell uses rowspan
     rows: list[str] = []
+    has_inprogress = False
     for date in all_dates:
         reports = reports_by_date[date]
         num_reports = len(reports)
+        date_tooltip = _build_date_tooltip(reports_dir, date)
+        report_info = _infer_report_status(reports_dir, logs_dir, date)
+        report_status   = report_info["status"]
+        report_last_upd = report_info["last_updated"]
+        title_attr = (
+            f' title="Last updated: {html.escape(report_last_upd)}"'
+            if report_last_upd else ""
+        )
+        if report_status == "in_progress":
+            has_inprogress = True
+        inprogress_badge = (
+            f' <span class="inprogress-badge"{title_attr}>&#x27F3; In Progress</span>'
+            if report_status == "in_progress" else ""
+        )
 
         for i, report_file in enumerate(reports):
             report_label_text = html.escape(_report_label(report_file))
@@ -204,7 +319,7 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
                 rowspan = f' rowspan="{num_reports}"' if num_reports > 1 else ""
                 rows.append(
                     f'<tr>'
-                    f'<td class="date-cell"{rowspan}>{html.escape(date)}</td>'
+                    f'<td class="date-cell"{rowspan}>{html.escape(date)}{inprogress_badge}{date_tooltip}</td>'
                     f'<td class="reports-cell">{report_link}</td>'
                     f'<td class="logs-cell">{log_link}</td>'
                     f'</tr>'
@@ -224,12 +339,14 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
     # Build run history section
     run_history_html = _build_run_history_html(logs_dir)
 
+    refresh_meta = '    <meta http-equiv="refresh" content="120">\n' if has_inprogress else ""
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LKML Activity Reports</title>
+{refresh_meta}    <title>LKML Activity Reports</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -308,6 +425,73 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             font-size: 1.0em;
             white-space: nowrap;
             width: 130px;
+            position: relative;
+        }}
+        .date-cell:hover .date-tooltip {{
+            display: block;
+        }}
+        .date-tooltip {{
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: calc(100% + 10px);
+            transform: translateY(-50%);
+            background: #1a1a1a;
+            color: #f0f0f0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            min-width: 220px;
+            z-index: 100;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            font-size: 0.82em;
+            line-height: 1.5;
+            font-weight: normal;
+            white-space: normal;
+        }}
+        .date-tooltip::before {{
+            content: "";
+            position: absolute;
+            top: 50%;
+            right: 100%;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-right-color: #1a1a1a;
+        }}
+        .tt-table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: transparent;
+            box-shadow: none;
+            border-radius: 0;
+        }}
+        .tt-table thead th {{
+            background: transparent;
+            color: #aaa;
+            font-size: 0.78em;
+            padding: 0 6px 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }}
+        .tt-table tbody tr {{
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }}
+        .tt-table tbody tr:last-child {{
+            border-bottom: none;
+        }}
+        .tt-table tbody tr:hover {{
+            background: rgba(255,255,255,0.06);
+        }}
+        .tt-name {{
+            padding: 3px 8px 3px 0;
+            color: #f0f0f0;
+        }}
+        .tt-badge {{
+            padding: 3px 0;
+            color: #7ec8e3;
+            font-weight: 700;
+            text-align: right;
+            white-space: nowrap;
         }}
         .reports-cell {{
             display: flex;
@@ -347,23 +531,6 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             color: #ccc;
             font-size: 0.82em;
             font-style: italic;
-        }}
-        .reviews-link {{
-            display: inline-block;
-            margin-bottom: 20px;
-            padding: 8px 16px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            font-size: 0.9em;
-        }}
-        .reviews-link a {{
-            color: #0366d6;
-            text-decoration: none;
-            font-weight: 500;
-        }}
-        .reviews-link a:hover {{
-            text-decoration: underline;
         }}
         .history-details {{
             margin-top: 32px;
@@ -432,6 +599,23 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             margin-top: 32px;
             padding: 16px;
         }}
+        .inprogress-badge {{
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: 600;
+            margin-left: 6px;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+            vertical-align: middle;
+            animation: pulse 2s ease-in-out infinite;
+        }}
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50%       {{ opacity: 0.45; }}
+        }}
     </style>
 </head>
 <body>
@@ -452,8 +636,6 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             <div class="stat-label">Log Files</div>
         </div>
     </div>
-
-    {'<div class="reviews-link"><a href="reviews/">Browse Review Comments &rarr;</a></div>' if has_reviews else ''}
 
     <table>
         <thead>

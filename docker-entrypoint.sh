@@ -47,11 +47,22 @@ run_cmd() {
     fi
 }
 
+# Auto-enable GitHub publishing when GITHUB_REPO is set, without requiring
+# --publish-github to be spelled out in REPORT_ARGS.  If GITHUB_REPO is empty
+# the flag is omitted and no push is attempted.
+PUBLISH_FLAG=""
+if [ -n "$GITHUB_REPO" ]; then
+    case "${REPORT_ARGS:-}" in
+        *--publish-github*) ;;   # already present, avoid duplication
+        *) PUBLISH_FLAG="--publish-github" ;;
+    esac
+fi
+
 if [ -n "$CRON_SCHEDULE" ]; then
     echo "[entrypoint] Cron mode: schedule='$CRON_SCHEDULE'"
 
     # Build the command line from REPORT_ARGS env var (space-separated flags)
-    REPORT_CMD="cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} ${REPORT_ARGS:-}"
+    REPORT_CMD="cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} ${REPORT_ARGS:-} ${PUBLISH_FLAG}"
 
     # Wrap in su if running as non-root
     if [ -n "$RUN_AS" ]; then
@@ -88,7 +99,7 @@ if [ -n "$CRON_SCHEDULE" ]; then
     # generate_report.py handles review pages, index rebuild, and GitHub publish per-day.
     if [ "$RUN_ON_STARTUP" = "true" ]; then
         echo "[entrypoint] RUN_ON_STARTUP=true, running initial report..."
-        run_cmd "cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} ${REPORT_ARGS:-}" 2>&1
+        run_cmd "cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} ${REPORT_ARGS:-} ${PUBLISH_FLAG}" 2>&1
     fi
 
     # Start cron in foreground (cron itself must run as root)
@@ -98,5 +109,5 @@ else
     echo "[entrypoint] Per-report logs written to: $LOG_DIR"
     # Pass all arguments through to generate_report.py (Python creates per-report logs)
     # generate_report.py handles review pages, index rebuild, and GitHub publish per-day.
-    run_cmd "cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} $*" 2>&1
+    run_cmd "cd /app && python generate_report.py --logs-dir ${LOG_DIR} --retention-days ${RETENTION_DAYS} ${PUBLISH_FLAG} $*" 2>&1
 fi

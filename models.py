@@ -56,6 +56,7 @@ class ReviewComment:
     raw_body: str = ""                  # Original comment text (quote-stripped, multi-msg joined)
     reply_to: str = ""                  # Short name of who this comment is replying to (if known)
     message_date: str = ""              # YYYY-MM-DD of earliest message from this reviewer
+    message_id: str = ""                # Message-ID (no angle brackets) for lore.kernel.org link
 
 
 @dataclass

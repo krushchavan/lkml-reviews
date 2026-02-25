@@ -457,10 +457,11 @@ def _determine_discussion_progress(
     if not messages:
         return None, ""
 
-    # Check if this is an RFC
-    if re.search(r"\bRFC\b", subject):
-        # Still check if it progressed beyond RFC
-        pass  # Fall through to normal analysis; RFC is the fallback
+    # Detect RFC patches: [RFC PATCH ...] or plain [RFC] in subject.
+    # RFC status is preserved unless the thread shows a terminal outcome
+    # (ACCEPTED or SUPERSEDED). Receiving review feedback is expected for RFCs
+    # and should NOT demote them to UNDER_REVIEW/CHANGES_REQUESTED.
+    is_rfc_patch = bool(re.search(r"\[RFC(?:\s+PATCH)?\b", subject, re.IGNORECASE))
 
     # Count substantive replies (not the author's own patch messages)
     root_from = messages[0].get("from", "").lower() if messages else ""
@@ -506,7 +507,7 @@ def _determine_discussion_progress(
         from_field = msg.get("from", "")
         author = _extract_author_short(from_field)
 
-        # Check accepted
+        # Check accepted — terminal: overrides RFC status
         for pattern in _ACCEPTED_PATTERNS:
             if re.search(pattern, body, re.IGNORECASE):
                 return (
@@ -514,7 +515,7 @@ def _determine_discussion_progress(
                     f"{author} applied/merged the patch",
                 )
 
-        # Check superseded
+        # Check superseded — terminal: overrides RFC status
         for pattern in _SUPERSEDED_PATTERNS:
             if re.search(pattern, body, re.IGNORECASE):
                 return (
@@ -536,8 +537,10 @@ def _determine_discussion_progress(
                         f"Author will post an updated version",
                     )
 
-        # Check changes requested (from reviewers)
-        if not is_author:
+        # Check changes requested (from reviewers).
+        # For RFC patches, reviewer feedback is part of the RFC process —
+        # the RFC label takes precedence and will be applied below.
+        if not is_author and not is_rfc_patch:
             for pattern in _CHANGES_REQUESTED_PATTERNS:
                 if re.search(pattern, body, re.IGNORECASE):
                     return (
@@ -545,9 +548,19 @@ def _determine_discussion_progress(
                         f"{author} requested changes",
                     )
 
-    # No strong signal from content; use structural heuristics
-    if re.search(r"\bRFC\b", subject) and reply_count == 0:
-        return DiscussionProgress.RFC, "RFC posted, awaiting feedback"
+    # No terminal signal found — use structural heuristics.
+    # RFC patches always retain RFC status at this point.
+    if is_rfc_patch:
+        if reply_count == 0:
+            return DiscussionProgress.RFC, "RFC posted, awaiting feedback"
+        if has_ack_or_review_tag:
+            tags_str = "; ".join(ack_tags[:2])
+            return DiscussionProgress.RFC, f"RFC receiving feedback: {tags_str}"
+        return (
+            DiscussionProgress.RFC,
+            f"RFC under discussion ({reply_count} "
+            f"{'reply' if reply_count == 1 else 'replies'})",
+        )
 
     if reply_count == 0:
         return (

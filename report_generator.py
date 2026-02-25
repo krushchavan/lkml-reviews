@@ -112,12 +112,21 @@ def _render_review_comment(rc: ReviewComment) -> str:
     if rc.summary:
         parts.append(f'<div class="review-comment-text">{_esc(rc.summary)}</div>')
 
-    # Collapsible raw body text
-    if rc.raw_body:
-        parts.append('<details class="raw-body-toggle">')
-        parts.append('<summary>Show original comment</summary>')
-        parts.append(f'<pre class="raw-body-text">{_esc(rc.raw_body)}</pre>')
-        parts.append('</details>')
+    # Collapsible raw body + lore link row
+    if rc.raw_body or rc.message_id:
+        parts.append('<div class="review-comment-footer">')
+        if rc.raw_body:
+            parts.append('<details class="raw-body-toggle">')
+            parts.append('<summary>Show original comment</summary>')
+            parts.append(f'<pre class="raw-body-text">{_esc(rc.raw_body)}</pre>')
+            parts.append('</details>')
+        if rc.message_id:
+            lore_url = f"https://lore.kernel.org/r/{_esc(rc.message_id)}"
+            parts.append(
+                f'<a href="{lore_url}" target="_blank" rel="noopener" '
+                f'class="lore-link">View on lore ↗</a>'
+            )
+        parts.append('</div>')
 
     # Sentiment signals
     if rc.sentiment_signals:
@@ -133,17 +142,23 @@ def _render_compact_reviews(conv: ConversationSummary, review_link: str) -> str:
     parts: list[str] = []
     parts.append('<div class="review-comments-compact">')
 
-    # Participant count
-    reviewer_descs = []
+    # Build reviewer list, deduplicating by author and merging annotations
+    author_annotations: dict[str, list[str]] = {}
     for rc in conv.review_comments:
-        desc = _esc(rc.author)
-        annotations = []
+        entry = author_annotations.setdefault(rc.author, [])
         if rc.tags_given:
-            annotations.extend(rc.tags_given)
+            entry.extend(rc.tags_given)
         if rc.has_inline_review:
-            annotations.append("Inline Review")
-        if annotations:
-            desc += f' ({", ".join(_esc(a) for a in annotations)})'
+            entry.append("Inline Review")
+
+    reviewer_descs = []
+    for author, annotations in author_annotations.items():
+        desc = _esc(author)
+        # Deduplicate annotations (e.g. "Reviewed-by" from two segments)
+        seen: set[str] = set()
+        unique_ann = [a for a in annotations if not (a in seen or seen.add(a))]
+        if unique_ann:
+            desc += f' ({", ".join(_esc(a) for a in unique_ann)})'
         reviewer_descs.append(desc)
 
     parts.append(f'<span class="review-comments-header">'
@@ -544,6 +559,7 @@ def generate_html_report(
     daily_report: DailyReport,
     review_links: Optional[dict[str, str]] = None,
     log_filename: Optional[str] = None,
+    progress_status: Optional[dict] = None,
 ) -> str:
     """Generate a complete self-contained HTML report.
 
@@ -575,12 +591,35 @@ def generate_html_report(
 
     stats_section = _render_statistics(daily_report)
 
+    progress_html = ""
+    if progress_status:
+        done  = progress_status.get("done", 0)
+        total = progress_status.get("total", 0)
+        cur   = progress_status.get("current", "")
+        last_updated = progress_status.get("last_updated", "")
+        cur_line = (
+            f' &mdash; <span class="progress-current">Processing: {_esc(cur)}</span>'
+        ) if cur else ""
+        updated_line = (
+            f'<span class="progress-updated">Updated: {_esc(last_updated)}</span>'
+        ) if last_updated else ""
+        progress_html = (
+            f'<div class="progress-banner">'
+            f'<span class="progress-spinner">&#x27F3;</span>'
+            f'<span class="progress-count">{done} / {total} developers complete</span>'
+            f'{cur_line}'
+            f'{updated_line}'
+            f'</div>'
+        )
+
+    refresh_meta = '    <meta http-equiv="refresh" content="120">\n' if progress_status else ""
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LKML Activity Report - {_esc(daily_report.date)}{' [' + _esc(llm_label) + ']' if llm_label else ''}</title>
+{refresh_meta}    <title>LKML Activity Report - {_esc(daily_report.date)}{' [' + _esc(llm_label) + ']' if llm_label else ''}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -616,13 +655,6 @@ def generate_html_report(
             padding: 20px;
             text-align: center;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            position: relative;
-            cursor: default;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }}
-        .stat-card:hover {{
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }}
         .contributors-section {{
             margin-bottom: 32px;
@@ -941,6 +973,26 @@ def generate_html_report(
             color: #444;
             border: 1px solid #e8e8e8;
         }}
+        .review-comment-footer {{
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }}
+        .lore-link {{
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.82em;
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+            white-space: nowrap;
+        }}
+        .lore-link:hover {{
+            text-decoration: underline;
+            color: #0056b3;
+        }}
         .review-comments-compact {{
             margin-top: 8px;
             border-left: 3px solid #ddd;
@@ -1026,6 +1078,18 @@ def generate_html_report(
             vertical-align: middle;
             margin-left: 8px;
         }}
+        .back-to-index {{
+            margin-bottom: 16px;
+        }}
+        .back-to-index a {{
+            color: #555;
+            text-decoration: none;
+            font-size: 0.85em;
+        }}
+        .back-to-index a:hover {{
+            color: #1565c0;
+            text-decoration: underline;
+        }}
         .analysis-mode {{
             font-size: 0.85em;
             color: #888;
@@ -1071,13 +1135,50 @@ def generate_html_report(
             padding-bottom: 6px;
             border-bottom: 1px solid #eee;
         }}
+        .progress-banner {{
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #856404;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
+        .progress-spinner {{
+            display: inline-block;
+            animation: spin 1.2s linear infinite;
+            font-style: normal;
+        }}
+        @keyframes spin {{
+            from {{ transform: rotate(0deg); }}
+            to   {{ transform: rotate(360deg); }}
+        }}
+        .progress-count {{
+            font-weight: 700;
+        }}
+        .progress-current {{
+            color: #0c5460;
+            font-style: italic;
+        }}
+        .progress-updated {{
+            margin-left: auto;
+            font-size: 0.85em;
+            color: #6c5500;
+            opacity: 0.75;
+        }}
     </style>
 </head>
 <body>
+    <p class="back-to-index"><a href="index.html">&#8592; Back to Index</a></p>
     <h1>LKML Activity Report{' <span class="llm-badge">LLM: ' + _esc(llm_label) + '</span>' if llm_label else ''}</h1>
     <h2>{_esc(daily_report.date)} &mdash; Generated {_esc(now)}</h2>
     {'<p class="analysis-mode">Analysis: LLM-enriched (' + _esc(llm_label) + ')</p>' if llm_label else '<p class="analysis-mode">Analysis: Heuristic</p>'}
     {'<p class="log-link"><a href="/logs/' + _esc(log_filename) + '">View generation log</a></p>' if log_filename else ''}
+    {progress_html}
 
     {stats_section}
 

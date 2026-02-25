@@ -41,7 +41,15 @@ logger = logging.getLogger(__name__)
 # Increment when prompt templates, _sentence_range(), or _scale_max_tokens() change.
 # This is included in cache keys so that stale cached responses (generated with
 # different prompt instructions) are automatically invalidated.
-_PROMPT_VERSION = "v4"
+_PROMPT_VERSION = "v5"
+
+# Maximum number of per-reviewer LLM groups before falling back to coarser grouping.
+# A heavily-reviewed thread with 50+ messages and inline reviews can produce hundreds
+# of segments (one per inline block), which would take hours to analyse.
+# Fallback 1: collapse inline segments → one group per message.
+# Fallback 2: group by author, batching up to _MAX_AUTHOR_BATCH_CHARS per call.
+_MAX_REVIEWER_GROUPS = 40
+_MAX_AUTHOR_BATCH_CHARS = 24_000  # ~6K tokens; fits comfortably in 128K context
 
 
 # ---------------------------------------------------------------------------
@@ -381,12 +389,28 @@ def _build_analysis_prompt(
         "NEW_VERSION_EXPECTED, WAITING_FOR_REVIEW, SUPERSEDED, RFC"
     )
 
+    # Detect RFC patches from subject so the LLM gets an explicit override hint
+    is_rfc_patch = bool(re.search(r"\[RFC(?:\s+PATCH)?\b", subject, re.IGNORECASE))
+
     patch_instruction = ""
     if is_patch:
         patch_sr = _sentence_range(len(thread_text), "patch")
+        rfc_note = (
+            " Note: this is an RFC patch (seeking design feedback, not yet intended for merge)."
+            if is_rfc_patch else ""
+        )
         patch_instruction = f"""
-- "patch_summary": A {patch_sr} summary of what the patch/series does technically.
+- "patch_summary": A {patch_sr} summary of what the patch/series does technically.{rfc_note}
   Focus on the problem it solves and the approach taken. Do NOT just repeat the subject line."""
+
+    rfc_progress_override = ""
+    if is_rfc_patch:
+        rfc_progress_override = """
+- RFC PATCH OVERRIDE: The subject contains [RFC PATCH], meaning this is a Request For Comments
+  submission not yet intended for merge. Set discussion_progress to 'RFC' UNLESS the thread
+  clearly shows the patch was applied/merged by a maintainer (use ACCEPTED) or replaced by a
+  newer non-RFC submission (use SUPERSEDED). Reviewer feedback and change requests are part of
+  the normal RFC process and do NOT override RFC status."""
 
     reviewer_sr = _sentence_range(len(thread_text), "reviewer")
 
@@ -427,7 +451,7 @@ Field rules:
   UNDER_REVIEW = active discussion, no verdict yet.
   WAITING_FOR_REVIEW = no substantive replies yet.
   SUPERSEDED = replaced by a newer version.
-  RFC = Request For Comments, not yet intended for merge.
+  RFC = Request For Comments, not yet intended for merge.{rfc_progress_override}
 - "review_comments": One entry per RESPONSE MESSAGE (not per reviewer). If a reviewer sends
   three separate messages in the thread, produce three entries for them, each with its own
   summary, sentiment, and reply_to. Do NOT merge multiple messages from the same author into one.
@@ -853,19 +877,61 @@ def _build_conversation_summary(
 # Cache key computation
 # ---------------------------------------------------------------------------
 
+def _message_date_for_cache(
+    activity_item: "ActivityItem",
+    thread_messages: Optional[List[Dict]] = None,
+) -> str:
+    """Return the YYYY-MM-DD to use as the cache file for *activity_item*'s thread.
+
+    Priority:
+    1. Date prefix in kernel-format message-id (e.g. '20260219...' → '2026-02-19').
+    2. Root message's actual RFC 2822 date header from thread_messages[0].
+       This is stable across runs because the original message date never changes,
+       even as new replies arrive.  For Gmail-ID threads (e.g. cover letters sent
+       via Gmail), submitted_date is derived from the feed's `updated` timestamp
+       which is the date of the *latest reply* — so it changes every day a new
+       reply arrives, causing cache misses.  Using the root message's own date
+       header avoids this completely.
+    3. submitted_date legacy fallback (may be latest-reply date for ongoing patches).
+    4. activity_item.date truncated to YYYY-MM-DD.
+
+    All date sources are truncated to YYYY-MM-DD to produce a valid filename.
+    """
+    # 1. Standard kernel patch message-ids start with YYYYMMDDHHMMSS
+    m = re.match(r"^(\d{4})(\d{2})(\d{2})\d", activity_item.message_id)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    # 2. Root message's RFC 2822 date header — stable regardless of new replies.
+    if thread_messages:
+        from email.utils import parsedate as _parsedate
+        import time as _time2
+        root_date_raw = thread_messages[0].get("date", "")
+        if root_date_raw:
+            try:
+                pd = _parsedate(root_date_raw)
+                if pd:
+                    return _time2.strftime("%Y-%m-%d", pd)
+            except Exception:
+                pass
+    # 3. submitted_date fallback (may be latest-reply date for ongoing patches).
+    if activity_item.submitted_date:
+        return activity_item.submitted_date[:10]
+    # 4. activity.date — the activity timestamp.
+    return (activity_item.date or "")[:10]
+
+
 def _compute_cache_key(
     message_id: str,
     messages: List[Dict],
     backend: Optional[LLMBackend] = None,
 ) -> str:
-    """Compute a cache key from message_id + content hash + backend/model.
+    """Compute a stable cache key from message_id + backend/model + prompt version.
 
-    The hash includes:
-    - The count and message-ids of all thread messages, so the cache is
-      invalidated if the thread grows (new replies).
-    - The backend type and model name, so switching between e.g.
-      ollama/llama3.1:8b and anthropic/claude-haiku-4-5 produces separate
-      cache entries.
+    Deliberately excludes thread length and reply message-ids so the key does
+    not change as new replies arrive.  Each message/reviewer sub-call gets its
+    own cache entry via the ``_pr_<suffix>`` extension in
+    _compute_per_reviewer_cache_key().  Use --llm-no-cache to force
+    re-analysis unconditionally.
     """
     # Identify backend + model so different LLMs don't share cached results
     if isinstance(backend, OllamaBackend):
@@ -877,10 +943,7 @@ def _compute_cache_key(
     else:
         backend_tag = "unknown"
 
-    content_parts = [message_id, backend_tag, _PROMPT_VERSION, str(len(messages))]
-    for msg in messages:
-        content_parts.append(msg.get("message_id", ""))
-    content_str = "|".join(content_parts)
+    content_str = "|".join([message_id, backend_tag, _PROMPT_VERSION])
     content_hash = hashlib.sha256(content_str.encode()).hexdigest()[:16]
     return f"{message_id}_{content_hash}"
 
@@ -997,6 +1060,7 @@ def _split_body_into_segments(body: str) -> List[str]:
 
 def _group_messages_by_reviewer(
     messages: List[Dict],
+    allow_inline_segments: bool = True,
 ) -> Dict[str, Dict]:
     """Return one entry per author-text segment within each message.
 
@@ -1005,6 +1069,10 @@ def _group_messages_by_reviewer(
     lines).  Each segment becomes its own independent entry so the LLM
     produces a focused summary for that specific point rather than a blended
     summary across all of the author's inline comments.
+
+    When *allow_inline_segments* is False, all segments from one message are
+    merged back into a single entry — used as a fallback when the thread would
+    otherwise produce too many groups for practical LLM processing.
 
     Returns dict mapping a unique per-segment key -> {
         "name": "First Last",
@@ -1063,6 +1131,10 @@ def _group_messages_by_reviewer(
         body = msg.get("body", "")
         segments = _split_body_into_segments(body)
 
+        if not allow_inline_segments and len(segments) > 1:
+            # Collapse all author segments into one block
+            segments = ["\n\n".join(segments)]
+
         if len(segments) <= 1:
             # Single segment (or no splits) — one entry for the whole message
             segment_text = segments[0] if segments else body.strip()
@@ -1078,9 +1150,12 @@ def _group_messages_by_reviewer(
                 "reply_to_name": reply_to_name,
                 "message_date": ymd,
                 "raw_body": segment_text,
+                "base_msg_id": msg_id,
             }
         else:
-            # Multiple segments — one entry per segment
+            # Multiple segments — one LLM call per segment to stay within token limits.
+            # Results are merged back into one ReviewComment per message after the loop
+            # in _analyze_per_reviewer (via _merge_segment_results).
             for seg_idx, segment_text in enumerate(segments):
                 group_key = f"{msg_id}_seg{seg_idx}"
                 synthetic_msg = dict(msg)
@@ -1093,7 +1168,88 @@ def _group_messages_by_reviewer(
                     "reply_to_name": reply_to_name,
                     "message_date": ymd,
                     "raw_body": segment_text,
+                    "base_msg_id": msg_id,  # used by _merge_segment_results
                 }
+
+    return groups
+
+
+def _group_messages_by_author_batched(
+    messages: List[Dict],
+    max_chars_per_batch: int = _MAX_AUTHOR_BATCH_CHARS,
+) -> Dict[str, Dict]:
+    """Return one entry per author-batch, grouping all messages from the same author.
+
+    Used as a last-resort fallback when even per-message grouping (with inline
+    segments collapsed) would still produce too many LLM calls.  All non-root
+    messages for each author are concatenated (in thread order) into batches of
+    at most *max_chars_per_batch* characters.
+
+    Returns the same dict structure as _group_messages_by_reviewer so the rest
+    of _analyze_per_reviewer can use it without changes.
+    """
+    from email.utils import parsedate as _parsedate
+    import time as _time2
+
+    def _msg_ymd(msg: Dict) -> str:
+        raw = msg.get("date", "")
+        if not raw:
+            return ""
+        try:
+            pd = _parsedate(raw)
+            return _time2.strftime("%Y-%m-%d", pd) if pd else ""
+        except Exception:
+            return ""
+
+    root_email = _extract_email(messages[0].get("from", ""))
+
+    # Collect non-root messages grouped by author, preserving thread order.
+    author_order: List[str] = []  # first-seen, for deterministic output
+    author_msgs: Dict[str, List[Dict]] = {}
+    author_meta: Dict[str, Dict] = {}  # email -> {name, is_author}
+
+    for msg in messages[1:]:  # skip root
+        from_field = msg.get("from", "")
+        email = _extract_email(from_field)
+        name = _extract_author_short(from_field)
+        if email not in author_msgs:
+            author_msgs[email] = []
+            author_order.append(email)
+            author_meta[email] = {"name": name, "is_author": email == root_email}
+        author_msgs[email].append(msg)
+
+    groups: Dict[str, Dict] = {}
+
+    for email in author_order:
+        meta = author_meta[email]
+        # Split this author's messages into char-limited batches.
+        batches: List[List[Dict]] = [[]]
+        batch_chars = 0
+
+        for msg in author_msgs[email]:
+            body_len = len(msg.get("body", "").strip())
+            if batch_chars + body_len > max_chars_per_batch and batches[-1]:
+                batches.append([])
+                batch_chars = 0
+            batches[-1].append(msg)
+            batch_chars += body_len
+
+        for b_idx, batch in enumerate(batches):
+            combined = "\n\n---\n\n".join(m.get("body", "").strip() for m in batch)
+            first = batch[0]
+            base_id = first.get("message_id", "").strip("<>") or f"{email}_{b_idx}"
+            synthetic = dict(first)
+            synthetic["body"] = combined
+            groups[f"{email}_{b_idx}"] = {
+                "name": meta["name"],
+                "email": email,
+                "messages": [synthetic],
+                "is_author": meta["is_author"],
+                "reply_to_name": "",   # not tracked in batched mode
+                "message_date": _msg_ymd(first),
+                "raw_body": combined,
+                "base_msg_id": base_id,
+            }
 
     return groups
 
@@ -1165,6 +1321,7 @@ def _summarize_patch_series_chunked(
     Returns the combined summary string, or None if all calls failed.
     """
     backend_label = f"{type(backend).__name__}({backend.model})"
+    msg_date = _message_date_for_cache(activity_item, messages)
     summaries: List[str] = []
 
     for i, msg in enumerate(messages):
@@ -1172,7 +1329,7 @@ def _summarize_patch_series_chunked(
         msg_cache_key = _compute_per_reviewer_cache_key(
             activity_item.message_id, messages, backend, suffix,
         )
-        cached = cache.get(msg_cache_key) if cache else None
+        cached = cache.get(msg_cache_key, msg_date) if cache else None
 
         if cached is not None:
             s = cached.get("patch_summary", "")
@@ -1180,6 +1337,7 @@ def _summarize_patch_series_chunked(
                 summaries.append(s)
             continue
 
+        logger.info("Cache miss: %s", msg_cache_key)
         # Build a small prompt from this single message
         msg_text = _build_thread_text([msg], max_chars=3000)
         subject = msg.get("subject", activity_item.subject)
@@ -1207,7 +1365,7 @@ def _summarize_patch_series_chunked(
             if parsed_summary:
                 summaries.append(parsed_summary)
                 if cache:
-                    cache.put(msg_cache_key, {"patch_summary": parsed_summary})
+                    cache.put(msg_cache_key, {"patch_summary": parsed_summary}, msg_date)
             else:
                 logger.warning(
                     "Patch series chunk %d/%d parse failed for %s",
@@ -1537,6 +1695,88 @@ def _compute_per_reviewer_cache_key(
     return f"{base_key}_pr_{suffix}"
 
 
+_SENTIMENT_RANK = {"CONTENTIOUS": 4, "NEEDS_WORK": 3, "NEUTRAL": 2, "POSITIVE": 1}
+
+
+def _merge_segment_results(results: List[Dict]) -> List[Dict]:
+    """Merge per-segment reviewer results back into per-message entries.
+
+    _group_messages_by_reviewer splits inline-review emails into one group entry
+    per author-text segment so each LLM call stays within token limits.  Each
+    segment produces its own result dict tagged with ``_base_msg_id``.  This
+    function merges consecutive results sharing the same ``_base_msg_id`` into a
+    single dict so that one original email → one ReviewComment card in the UI.
+
+    Merge rules:
+    - summary    : paragraphs joined with blank line
+    - raw_body   : segments separated by a divider line
+    - sentiment  : strongest wins (CONTENTIOUS > NEEDS_WORK > NEUTRAL > POSITIVE)
+    - signals / tags : union, order-preserving dedup
+    - has_inline_review : True if any segment had it
+    - analysis_source   : "llm" if any segment used LLM, else "heuristic"
+    - author, reply_to, message_date : taken from the first segment
+    """
+    if not results:
+        return results
+
+    def _dedup(lists):
+        seen: set = set()
+        out = []
+        for item in (x for lst in lists for x in lst):
+            if item not in seen:
+                seen.add(item)
+                out.append(item)
+        return out
+
+    merged: List[Dict] = []
+    i = 0
+    while i < len(results):
+        base = results[i].get("_base_msg_id", "")
+        # Collect the run of consecutive entries sharing this base key
+        j = i + 1
+        while j < len(results) and results[j].get("_base_msg_id", "") == base and base:
+            j += 1
+        group = results[i:j]
+
+        if len(group) == 1:
+            merged.append(group[0])
+        else:
+            combined = dict(group[0])
+            combined["summary"] = "\n\n".join(
+                e["summary"] for e in group if e.get("summary")
+            )
+            combined["raw_body"] = "\n\n---\n\n".join(
+                e["raw_body"] for e in group if e.get("raw_body")
+            )
+            combined["sentiment"] = max(
+                (e.get("sentiment", "NEUTRAL") for e in group),
+                key=lambda s: _SENTIMENT_RANK.get(s, 0),
+            )
+            combined["sentiment_signals"] = _dedup(
+                e.get("sentiment_signals", []) for e in group
+            )
+            combined["tags_given"] = _dedup(
+                e.get("tags_given", []) for e in group
+            )
+            combined["has_inline_review"] = any(
+                e.get("has_inline_review") for e in group
+            )
+            combined["analysis_source"] = (
+                "llm" if any(e.get("analysis_source") == "llm" for e in group)
+                else "heuristic"
+            )
+            logger.info(
+                "  Merged %d segments → 1 card for %s (%s)",
+                len(group),
+                base,
+                group[0].get("author", "?"),
+            )
+            merged.append(combined)
+        i = j
+
+    return merged
+
+
 def _analyze_per_reviewer(
     messages: List[Dict],
     activity_item: ActivityItem,
@@ -1553,8 +1793,13 @@ def _analyze_per_reviewer(
 
     Individual reviewer failures fall back to heuristic for that reviewer only.
     """
-    is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
+    is_patch = activity_item.activity_type in (
+        ActivityType.PATCH_SUBMITTED,
+        ActivityType.PATCH_REVIEWED,
+        ActivityType.PATCH_ACKED,
+    )
     backend_label = f"{type(backend).__name__}({backend.model})"
+    msg_date = _message_date_for_cache(activity_item, messages)
     participant_count = _count_participants_simple(messages)
 
     # --- Step 1: Patch Summary ---
@@ -1563,12 +1808,13 @@ def _analyze_per_reviewer(
         ps_cache_key = _compute_per_reviewer_cache_key(
             activity_item.message_id, messages, backend, "patch_summary"
         )
-        cached_ps = cache.get(ps_cache_key) if cache else None
+        cached_ps = cache.get(ps_cache_key, msg_date) if cache else None
 
         if cached_ps is not None:
             patch_summary = cached_ps.get("patch_summary", "")
             logger.debug("Per-reviewer cache hit for patch_summary: %s", activity_item.message_id)
         else:
+            logger.info("Cache miss: %s", ps_cache_key)
             patch_context_text = _build_patch_context_text(messages)
             ps_prompt = _build_patch_summary_prompt(patch_context_text, activity_item.subject)
 
@@ -1582,7 +1828,7 @@ def _analyze_per_reviewer(
                 patch_summary = _parse_patch_summary_response(raw) or ""
 
                 if patch_summary and cache:
-                    cache.put(ps_cache_key, {"patch_summary": patch_summary})
+                    cache.put(ps_cache_key, {"patch_summary": patch_summary}, msg_date)
 
                 if dump_dir:
                     _dump_llm_response(
@@ -1596,11 +1842,12 @@ def _analyze_per_reviewer(
 
     # --- Step 2: Per-Reviewer Analysis ---
     reviewer_groups = _group_messages_by_reviewer(messages)
+    total_reviewers = len(reviewer_groups)
     patch_context_text = _build_patch_context_text(messages, max_chars=2000)
 
     reviewer_results: List[Dict] = []
 
-    for group_key, group_info in reviewer_groups.items():
+    for rv_idx, (group_key, group_info) in enumerate(reviewer_groups.items(), 1):
         reviewer_name = group_info["name"]
         reviewer_msgs = group_info["messages"]
         is_author = group_info["is_author"]
@@ -1610,6 +1857,9 @@ def _analyze_per_reviewer(
         reviewer_earliest_date = group_info.get("message_date", "")
         # Make cache/dump suffix unique per message (group_key == message-id)
         cache_suffix = group_key
+        # base_msg_id tracks the original message; _seg* entries share the same
+        # base and will be merged by _merge_segment_results after this loop.
+        base_msg_id = group_info.get("base_msg_id", group_key)
 
         # Check for substantive messages — tag-only contributors (e.g. a message
         # that is just "Reviewed-by: X") are captured via heuristic since there
@@ -1635,6 +1885,8 @@ def _analyze_per_reviewer(
                     "analysis_source": "heuristic",
                     "reply_to": reply_to_name,
                     "message_date": reviewer_earliest_date,
+                    "message_id": base_msg_id,
+                    "_base_msg_id": base_msg_id,
                 })
             continue
 
@@ -1642,13 +1894,17 @@ def _analyze_per_reviewer(
         rv_cache_key = _compute_per_reviewer_cache_key(
             activity_item.message_id, messages, backend, f"reviewer_{cache_suffix}"
         )
-        cached_rv = cache.get(rv_cache_key) if cache else None
+        cached_rv = cache.get(rv_cache_key, msg_date) if cache else None
 
         if cached_rv is not None:
-            reviewer_results.append(cached_rv)
+            rv_tagged = dict(cached_rv)
+            rv_tagged["_base_msg_id"] = base_msg_id
+            rv_tagged["message_id"] = base_msg_id
+            reviewer_results.append(rv_tagged)
             logger.debug("Per-reviewer cache hit for %s: %s", reviewer_name, activity_item.message_id)
             continue
 
+        logger.info("Cache miss: %s", rv_cache_key)
         # The segment text is already quote-stripped (set by _group_messages_by_reviewer).
         # Use it directly as the raw_body so "Show original" shows only this author's words.
         segment_text = group_info.get("raw_body", "")
@@ -1666,7 +1922,8 @@ def _analyze_per_reviewer(
         )
 
         logger.info(
-            "Per-reviewer: calling %s for reviewer '%s'%s (%d chars prompt, %d msgs)",
+            "    [%d/%d] Per-reviewer: calling %s for '%s'%s (%d chars, %d msgs)",
+            rv_idx, total_reviewers,
             backend_label, reviewer_name,
             f" (replying to {reply_to_name})" if reply_to_name else "",
             len(rv_prompt), len(reviewer_msgs),
@@ -1688,9 +1945,11 @@ def _analyze_per_reviewer(
                 parsed["raw_body"] = reviewer_raw_body
                 parsed["reply_to"] = reply_to_name
                 parsed["message_date"] = reviewer_earliest_date
+                parsed["message_id"] = base_msg_id
+                parsed["_base_msg_id"] = base_msg_id
                 reviewer_results.append(parsed)
                 if cache:
-                    cache.put(rv_cache_key, parsed)
+                    cache.put(rv_cache_key, parsed, msg_date)
                 logger.info(
                     "Per-reviewer LLM OK: %s -> %s (%s)",
                     reviewer_name, parsed["sentiment"], activity_item.message_id,
@@ -1705,6 +1964,8 @@ def _analyze_per_reviewer(
                 )
                 if heuristic_rc:
                     heuristic_rc["message_date"] = reviewer_earliest_date
+                    heuristic_rc["message_id"] = base_msg_id
+                    heuristic_rc["_base_msg_id"] = base_msg_id
                     reviewer_results.append(heuristic_rc)
 
         except Exception as e:
@@ -1717,7 +1978,14 @@ def _analyze_per_reviewer(
             )
             if heuristic_rc:
                 heuristic_rc["message_date"] = reviewer_earliest_date
+                heuristic_rc["message_id"] = base_msg_id
+                heuristic_rc["_base_msg_id"] = base_msg_id
                 reviewer_results.append(heuristic_rc)
+
+    # Merge per-segment results back into one entry per original message.
+    # Multiple LLM calls were made (one per segment) to stay within token limits;
+    # this step consolidates their outputs so the UI shows one card per email.
+    reviewer_results = _merge_segment_results(reviewer_results)
 
     # --- Step 3: Assemble Overall Summary ---
     overall_sentiment, overall_signals = _derive_overall_sentiment(reviewer_results)
@@ -1741,6 +2009,7 @@ def _analyze_per_reviewer(
             raw_body=rc_data.get("raw_body", ""),
             reply_to=rc_data.get("reply_to", ""),
             message_date=rc_data.get("message_date", ""),
+            message_id=rc_data.get("message_id", ""),
         ))
 
     logger.info(
@@ -1959,12 +2228,14 @@ def analyze_thread_llm(
     # Check cache first — key includes backend+model so different LLMs
     # don't share cached results.
     cache_key = _compute_cache_key(activity_item.message_id, thread_messages, backend)
+    msg_date = _message_date_for_cache(activity_item, thread_messages)
     if cache:
-        cached = cache.get(cache_key)
+        cached = cache.get(cache_key, msg_date)
         if cached is not None:
             logger.debug("LLM cache hit for %s", activity_item.message_id)
             participant_count = _count_participants_simple(thread_messages)
             return _build_conversation_summary(cached, participant_count, thread_messages)
+        logger.info("Cache miss: %s", cache_key)
 
     # --- Per-reviewer decomposition for Ollama on large threads ---
     if _should_use_per_reviewer_mode(backend, thread_messages, force_monolithic):
@@ -2003,7 +2274,7 @@ def analyze_thread_llm(
                         for rc in summary.review_comments
                     ],
                 }
-                cache.put(cache_key, assembled)
+                cache.put(cache_key, assembled, msg_date)
             return summary
         except Exception as e:
             logger.error(
@@ -2088,7 +2359,7 @@ def analyze_thread_llm(
 
         # Cache the merged+normalised result
         if cache:
-            cache.put(cache_key, parsed)
+            cache.put(cache_key, parsed, msg_date)
 
         participant_count = _count_participants_simple(thread_messages)
         summary = _build_conversation_summary(parsed, participant_count, thread_messages)

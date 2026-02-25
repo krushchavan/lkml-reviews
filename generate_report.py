@@ -33,7 +33,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -285,6 +285,19 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    parser.add_argument(
+        "--message-id",
+        type=str,
+        default=None,
+        metavar="MSG_ID",
+        help=(
+            "With --rebuild-html: render only the patchset whose message-id contains "
+            "this string (case-insensitive partial match, e.g. '20260126065242'). "
+            "Writes a standalone preview file (reports/preview_<slug>.html) without "
+            "touching the full report or index."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -513,11 +526,14 @@ def process_developer(
     # Fetch threads for conversation summaries on all items
     if not skip_threads:
         all_items = report.patches_submitted + reviews + acks + report.discussions_posted
+        total_items = len(all_items)
 
-        for item in all_items:
+        for item_idx, item in enumerate(all_items, 1):
             msg_id = item.message_id
             if item.conversation is not None:
-                continue  # Already analyzed
+                continue  # Already analyzed (cache hit)
+            short_subject = item.subject[:70] + ("\u2026" if len(item.subject) > 70 else "")
+            logger.info("  [%d/%d] %s", item_idx, total_items, short_subject)
             if msg_id in thread_cache:
                 thread_messages = thread_cache[msg_id]
             else:
@@ -552,11 +568,16 @@ def process_developer(
     return report
 
 
-def _serialize_daily_report(report: "DailyReport", report_filename: str) -> dict:
+def _serialize_daily_report(
+    report: "DailyReport", report_filename: str, status: str = "complete"
+) -> dict:
     """Serialize a DailyReport to a plain dict for JSON persistence.
 
     Captures enough information to fully reconstruct the DailyReport for
     --rebuild-html without any web fetches or LLM calls.
+
+    ``status`` is "in_progress" during incremental writes and "complete" once
+    the full report has been generated.
     """
     def _serialize_item(item: "ActivityItem") -> dict:
         conv = item.conversation
@@ -573,6 +594,7 @@ def _serialize_daily_report(report: "DailyReport", report_filename: str) -> dict
                     "raw_body": rc.raw_body,
                     "reply_to": rc.reply_to,
                     "message_date": rc.message_date,
+                    "message_id": rc.message_id,
                     "analysis_source": rc.analysis_source,
                 })
         return {
@@ -605,6 +627,8 @@ def _serialize_daily_report(report: "DailyReport", report_filename: str) -> dict
     return {
         "date": report.date,
         "report_file": report_filename,
+        "status": status,
+        "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "llm_backends": report.llm_backends,
         "generation_time_seconds": report.generation_time_seconds,
         "developer_reports": dev_reports,
@@ -637,6 +661,7 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
                 raw_body=rc.get("raw_body", ""),
                 reply_to=rc.get("reply_to", ""),
                 message_date=rc.get("message_date", ""),
+                message_id=rc.get("message_id", ""),
                 analysis_source=rc.get("analysis_source", "heuristic"),
             ))
 
@@ -680,12 +705,186 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
     return report
 
 
+def _write_review_jsons(
+    daily_report: "DailyReport",
+    report_filename: str,
+    reviews_dir: Path,
+) -> dict[str, str]:
+    """Write per-patchset review JSON files and return a review_links mapping.
+
+    Extracts review comment data from *daily_report*, writes one JSON file per
+    patchset that has review comments (merging with any existing file to
+    accumulate data across report dates), and returns a dict mapping
+    ``message_id -> slug`` for every item that has reviews.
+
+    Extracted so that both ``generate_single_report()`` and
+    ``rebuild_html_from_json()`` can call the same logic.
+    """
+    reviews_data = extract_reviews_data(daily_report, report_filename)
+    review_links: dict[str, str] = {}
+
+    for item_data in reviews_data:
+        slug = item_data["slug"]
+        msg_id = item_data["message_id"]
+        review_links[msg_id] = slug
+
+        json_path = reviews_dir / f"{slug}.json"
+
+        # Merge with existing JSON (accumulate across dates)
+        if json_path.exists():
+            try:
+                existing = json.loads(json_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                existing = {}
+        else:
+            existing = {}
+
+        dates = existing.get("dates", {})
+        report_date = item_data["date"]
+        report_file = item_data["report_file"]
+
+        # Group reviews by their individual message_date
+        reviews_by_date: dict[str, list] = {}
+        for review in item_data["reviews"]:
+            bucket = review.get("message_date") or report_date
+            reviews_by_date.setdefault(bucket, []).append(review)
+
+        # Merge each date bucket into the JSON, preserving existing dates
+        for bucket_date, bucket_reviews in reviews_by_date.items():
+            link = report_file if bucket_date == report_date else dates.get(
+                bucket_date, {}
+            ).get("report_file", report_file)
+            date_entry = {
+                "report_file": link,
+                "developer": item_data["developer"],
+                "reviews": bucket_reviews,
+            }
+            if item_data.get("analysis_source"):
+                date_entry["analysis_source"] = item_data["analysis_source"]
+            if item_data.get("patch_summary"):
+                date_entry["patch_summary"] = item_data["patch_summary"]
+            dates[bucket_date] = date_entry
+
+        # Always ensure the report-run date entry exists
+        if report_date not in dates:
+            dates[report_date] = {
+                "report_file": report_file,
+                "developer": item_data["developer"],
+                "reviews": [],
+            }
+            if item_data.get("analysis_source"):
+                dates[report_date]["analysis_source"] = item_data["analysis_source"]
+            if item_data.get("patch_summary"):
+                dates[report_date]["patch_summary"] = item_data["patch_summary"]
+
+        merged = {
+            "thread_id": msg_id,
+            "subject": item_data["subject"],
+            "url": item_data["url"],
+            "dates": dates,
+        }
+        json_path.write_text(
+            json.dumps(merged, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    if reviews_data:
+        logger.info(
+            "Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir
+        )
+
+    return review_links
+
+
+def _write_incremental_update(
+    daily_report: "DailyReport",
+    output_path: Path,
+    reports_dir: Path,
+    logs_dir: Path,
+    report_filename: str,
+    progress_status: dict,
+    publish: bool = False,
+    publish_repo: str = "",
+    publish_branch: str = "main",
+    publish_token: str = "",
+) -> None:
+    """Write a partial HTML report + daily JSON + index and optionally push to GitHub.
+
+    Called before the developer loop (placeholder) and after each developer completes.
+    The daily JSON is written with status="in_progress" so build_index can show the
+    animated badge. The final complete report is written separately by
+    generate_single_report after the loop.
+    """
+    # 1. Save partial daily JSON with status="in_progress"
+    daily_dir = reports_dir / "daily"
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    daily_json_path = daily_dir / f"{daily_report.date}.json"
+    try:
+        daily_json_path.write_text(
+            json.dumps(
+                _serialize_daily_report(daily_report, report_filename, status="in_progress"),
+                indent=2, ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+    except OSError as e:
+        logger.warning("Incremental update: failed to write daily JSON: %s", e)
+        return
+
+    # 2. Build review_links for items processed so far
+    all_items = [
+        item
+        for dr in daily_report.developer_reports
+        for item in (dr.patches_submitted + dr.patches_reviewed
+                     + dr.patches_acked + dr.discussions_posted)
+        if item.message_id
+    ]
+    review_links = (
+        {item.message_id: message_id_to_slug(item.message_id) for item in all_items}
+        or None
+    )
+
+    # 3. Write partial HTML report with progress banner (include last_updated timestamp)
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    full_progress_status = {**progress_status, "last_updated": now_str}
+    try:
+        html_content = generate_html_report(
+            daily_report,
+            review_links=review_links,
+            log_filename=None,
+            progress_status=full_progress_status,
+        )
+        output_path.write_text(html_content, encoding="utf-8")
+    except OSError as e:
+        logger.warning("Incremental update: failed to write HTML: %s", e)
+        return
+
+    # 4. Rebuild index so the in-progress badge appears
+    try:
+        index_html = build_index(reports_dir, logs_dir)
+        (reports_dir / "index.html").write_text(index_html, encoding="utf-8")
+    except Exception as e:
+        logger.warning("Incremental update: failed to rebuild index: %s", e)
+
+    # 5. Push to GitHub if enabled
+    if publish and publish_repo:
+        done = progress_status.get("done", "?")
+        total = progress_status.get("total", "?")
+        logger.info("Incremental push to GitHub (%s/%s developers)...", done, total)
+        publish_to_github(reports_dir, publish_repo,
+                          branch=publish_branch, token=publish_token)
+
+
 def generate_single_report(
     args: argparse.Namespace,
     target_date: datetime,
     developers: list[Developer],
     client: LKMLClient,
     llm_backends: dict[str, "LLMBackend"],
+    publish: bool = False,
+    publish_repo: str = "",
+    publish_branch: str = "main",
+    publish_token: str = "",
 ) -> Path:
     """Generate a report for a single date. Returns the output file path."""
     date_display = target_date.strftime("%Y-%m-%d")
@@ -739,6 +938,19 @@ def generate_single_report(
         for backend_name, backend in llm_backends.items():
             daily_report.llm_backends.append((backend_name, backend.model))
 
+        # --- Placeholder: write "in progress" report before processing starts ---
+        dev_names = [d.name for d in developers]
+        _write_incremental_update(
+            daily_report, output_path, output_dir, logs_dir, output_path.name,
+            progress_status={
+                "done": 0, "total": len(developers),
+                "current": dev_names[0] if dev_names else "",
+                "pending": dev_names,
+            },
+            publish=publish, publish_repo=publish_repo,
+            publish_branch=publish_branch, publish_token=publish_token,
+        )
+
         for i, dev in enumerate(developers, 1):
             logger.info("[%d/%d] Processing %s for %s...", i, len(developers), dev.name, date_display)
             try:
@@ -762,99 +974,36 @@ def generate_single_report(
             daily_report.total_acks += len(dev_report.patches_acked)
             # discussions_posted not counted in totals (separate stat in HTML)
 
+            # --- Incremental update: push partial results after each developer ---
+            remaining = [d.name for d in developers[i:]]
+            _write_incremental_update(
+                daily_report, output_path, output_dir, logs_dir, output_path.name,
+                progress_status={
+                    "done": i, "total": len(developers),
+                    "current": remaining[0] if remaining else "",
+                    "pending": remaining,
+                },
+                publish=publish, publish_repo=publish_repo,
+                publish_branch=publish_branch, publish_token=publish_token,
+            )
+
         daily_report.generation_time_seconds = time.time() - start_time
 
         # --- Save per-patchset review JSON and build review_links ---
         reviews_dir = output_dir / "reviews"
         reviews_dir.mkdir(parents=True, exist_ok=True)
 
-        reviews_data = extract_reviews_data(daily_report, output_path.name)
-        review_links: dict[str, str] = {}  # message_id -> slug
-
-        for item_data in reviews_data:
-            slug = item_data["slug"]
-            msg_id = item_data["message_id"]
-            review_links[msg_id] = slug
-
-            json_path = reviews_dir / f"{slug}.json"
-
-            # Merge with existing JSON (accumulate across dates)
-            if json_path.exists():
-                try:
-                    existing = json.loads(json_path.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError):
-                    existing = {}
-            else:
-                existing = {}
-
-            # Preserve existing dates, update/add entries bucketed by message_date.
-            # Each review comment carries a message_date (the actual date the email
-            # was sent).  We group comments by that date so the review detail page
-            # can show accurate date chips ("Dan Carpenter — 2026-02-10") instead of
-            # incorrectly stamping all comments with the report-run date.
-            # Falls back to the report date for any comment without a message_date.
-            dates = existing.get("dates", {})
-            report_date = item_data["date"]
-            report_file = item_data["report_file"]
-
-            # Group reviews by their individual message_date
-            reviews_by_date: dict[str, list] = {}
-            for review in item_data["reviews"]:
-                bucket = review.get("message_date") or report_date
-                reviews_by_date.setdefault(bucket, []).append(review)
-
-            # Merge each date bucket into the JSON, preserving existing dates
-            for bucket_date, bucket_reviews in reviews_by_date.items():
-                # Only update the report_file link for the bucket that matches
-                # the current report date (so older buckets keep their original link)
-                link = report_file if bucket_date == report_date else dates.get(
-                    bucket_date, {}
-                ).get("report_file", report_file)
-
-                date_entry = {
-                    "report_file": link,
-                    "developer": item_data["developer"],
-                    "reviews": bucket_reviews,
-                }
-                if item_data.get("analysis_source"):
-                    date_entry["analysis_source"] = item_data["analysis_source"]
-                if item_data.get("patch_summary"):
-                    date_entry["patch_summary"] = item_data["patch_summary"]
-                dates[bucket_date] = date_entry
-
-            # Always ensure the report-run date entry exists (for report_file link
-            # and patch_summary), even if no comments fell on that exact date.
-            if report_date not in dates:
-                dates[report_date] = {
-                    "report_file": report_file,
-                    "developer": item_data["developer"],
-                    "reviews": [],
-                }
-                if item_data.get("analysis_source"):
-                    dates[report_date]["analysis_source"] = item_data["analysis_source"]
-                if item_data.get("patch_summary"):
-                    dates[report_date]["patch_summary"] = item_data["patch_summary"]
-
-            merged = {
-                "thread_id": msg_id,
-                "subject": item_data["subject"],
-                "url": item_data["url"],
-                "dates": dates,
-            }
-            json_path.write_text(
-                json.dumps(merged, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-
-        if reviews_data:
-            logger.info("Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir)
+        review_links = _write_review_jsons(daily_report, output_path.name, reviews_dir)
 
         # --- Save daily activity summary for --rebuild-html ---
         daily_dir = output_dir / "daily"
         daily_dir.mkdir(parents=True, exist_ok=True)
         daily_json_path = daily_dir / f"{date_display}.json"
         daily_json_path.write_text(
-            json.dumps(_serialize_daily_report(daily_report, output_path.name), indent=2, ensure_ascii=False),
+            json.dumps(
+                _serialize_daily_report(daily_report, output_path.name, status="complete"),
+                indent=2, ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         logger.debug("Saved daily summary: %s", daily_json_path)
@@ -875,6 +1024,8 @@ def generate_single_report(
             daily_report.total_acks,
             daily_report.generation_time_seconds,
         )
+        # Completion marker — build_index uses this to infer status from old logs
+        logger.info("Report generation complete: %s", date_display)
 
     except Exception as exc:
         status = "failed"
@@ -1219,6 +1370,69 @@ def publish_to_github(
     return True
 
 
+def _rebuild_single_patchset(args: argparse.Namespace, target_dates: list) -> None:
+    """Find a single patchset by message-id fragment and write a standalone preview HTML.
+
+    Searches all target_dates' daily JSON files for an item whose message_id contains
+    args.message_id (case-insensitive partial match). When found, builds a mini
+    DailyReport containing only that item and renders it to
+    reports/preview_<slug>.html — without touching the live report or index.
+    """
+    msg_filter = args.message_id.strip("<>").lower()
+    reports_dir = Path(args.output_dir)
+    daily_dir = reports_dir / "daily"
+    found = False
+
+    for target_date in target_dates:
+        date_str = target_date.strftime("%Y-%m-%d")
+        daily_json = daily_dir / f"{date_str}.json"
+        if not daily_json.exists():
+            continue
+        try:
+            daily_report = _load_daily_report(daily_json)
+        except Exception as e:
+            logger.error("Failed to load %s: %s", daily_json, e)
+            continue
+
+        for dr in daily_report.developer_reports:
+            categories = [
+                ("patches_submitted",  dr.patches_submitted),
+                ("patches_reviewed",   dr.patches_reviewed),
+                ("patches_acked",      dr.patches_acked),
+                ("discussions_posted", dr.discussions_posted),
+            ]
+            for cat_name, items in categories:
+                for item in items:
+                    if msg_filter not in item.message_id.lower():
+                        continue
+                    # Build a mini DailyReport containing only this one item
+                    mini_dr = DeveloperReport(developer=dr.developer)
+                    getattr(mini_dr, cat_name).append(item)
+                    mini_report = DailyReport(
+                        date=date_str,
+                        llm_backends=daily_report.llm_backends,
+                        generation_time_seconds=daily_report.generation_time_seconds,
+                    )
+                    mini_report.developer_reports.append(mini_dr)
+                    mini_report.total_patches = len(mini_dr.patches_submitted)
+                    mini_report.total_reviews = len(mini_dr.patches_reviewed)
+                    mini_report.total_acks    = len(mini_dr.patches_acked)
+
+                    slug = message_id_to_slug(item.message_id)
+                    preview_path = reports_dir / f"preview_{slug}.html"
+                    html_content = generate_html_report(mini_report, review_links=None)
+                    preview_path.write_text(html_content, encoding="utf-8")
+                    logger.info("Preview written: %s", preview_path)
+                    found = True
+
+    if not found:
+        logger.error(
+            "No patchset found matching --message-id '%s' in dates: %s",
+            args.message_id,
+            [d.strftime("%Y-%m-%d") for d in target_dates],
+        )
+
+
 def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None:
     """Re-render HTML reports from persisted daily summary JSON files.
 
@@ -1226,6 +1440,10 @@ def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None
     reconstruct a full DailyReport, then re-generates the HTML report,
     review pages, and index — without any web fetches or LLM calls.
     """
+    if getattr(args, "message_id", None):
+        _rebuild_single_patchset(args, target_dates)
+        return
+
     reports_dir = Path(args.output_dir)
     logs_dir = Path(args.logs_dir)
     daily_dir = reports_dir / "daily"
@@ -1254,20 +1472,11 @@ def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None
         report_filename = saved_data.get("report_file", f"{date_str}.html")
         output_path = reports_dir / report_filename
 
-        # Build review_links for all activity types
-        all_items = [
-            item
-            for dr in daily_report.developer_reports
-            for item in (
-                dr.patches_submitted + dr.patches_reviewed
-                + dr.patches_acked + dr.discussions_posted
-            )
-            if item.message_id
-        ]
-        review_links = {
-            item.message_id: message_id_to_slug(item.message_id)
-            for item in all_items
-        }
+        # Write review JSON files (creates missing ones, merges with existing)
+        # and get the review_links mapping for items that actually have reviews.
+        reviews_dir = reports_dir / "reviews"
+        reviews_dir.mkdir(parents=True, exist_ok=True)
+        review_links = _write_review_jsons(daily_report, report_filename, reviews_dir)
 
         # Re-render the daily HTML report
         html_content = generate_html_report(
@@ -1291,11 +1500,15 @@ def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None
 def main():
     args = parse_args()
 
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S %Z",
-    )
+    _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S %Z")
+    _console = logging.StreamHandler()
+    _console.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    _console.setFormatter(_fmt)
+    # Root logger must be DEBUG so per-report file handlers (which are always DEBUG)
+    # actually receive DEBUG records. Console threshold is controlled separately above.
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(_console)
 
     # --- Purge-only mode ---
     if args.purge_only:
@@ -1465,7 +1678,13 @@ def main():
                 "=== Day %d/%d: %s ===",
                 day_num, num_days, target_date.strftime("%Y-%m-%d"),
             )
-        generate_single_report(args, target_date, developers, client, llm_backends)
+        generate_single_report(
+            args, target_date, developers, client, llm_backends,
+            publish=publish,
+            publish_repo=publish_repo,
+            publish_branch=publish_branch,
+            publish_token=publish_token,
+        )
 
         # --- Rebuild review HTML pages and index after every day ---
         logger.info("Rebuilding review pages...")
