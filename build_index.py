@@ -160,7 +160,7 @@ def _build_run_history_html(logs_dir: Path) -> str:
             status_html = f'<span class="status-fail" title="{title}">FAIL</span>'
 
         report_link = f'<a href="{html.escape(report_file)}">{html.escape(report_date)}</a>' if report_file else report_date
-        log_link = f'<a href="/logs/{html.escape(log_file)}" class="log-link">Log</a>' if log_file else "--"
+        log_link = f'<a href="logs/{html.escape(log_file)}" class="log-link">Log</a>' if log_file else "--"
 
         rows.append(
             f"<tr>"
@@ -311,7 +311,7 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             log_file = _match_log(report_file, log_files, logs_by_date)
             if log_file:
                 matched_logs.add(log_file)
-                log_link = f'<a href="/logs/{html.escape(log_file)}" class="log-link">Log</a>'
+                log_link = f'<a href="logs/{html.escape(log_file)}" class="log-link">Log</a>'
             else:
                 log_link = '<span class="none">--</span>'
 
@@ -660,11 +660,11 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Build index.html for LKML reports.")
     parser.add_argument("--reports-dir", default="reports", help="Reports directory. Default: reports/")
-    parser.add_argument("--logs-dir", default="logs", help="Logs directory. Default: logs/")
+    parser.add_argument("--logs-dir", default=None, help="Logs directory. Default: <reports-dir>/logs/")
     args = parser.parse_args()
 
     reports_dir = Path(args.reports_dir)
-    logs_dir = Path(args.logs_dir)
+    logs_dir = Path(args.logs_dir) if args.logs_dir else reports_dir / "logs"
 
     index_html = build_index(reports_dir, logs_dir)
     output = reports_dir / "index.html"

@@ -7,7 +7,6 @@ services:
     volumes:
       - ./reports:/app/reports:z
       - ./.llm_cache:/app/.llm_cache:z
-      - ./logs:/app/logs:z
     env_file:
       - path: ./.env
         required: false
@@ -43,17 +42,6 @@ services:
     # On-demand usage (override cron by unsetting schedule):
     #   docker compose run --rm -e CRON_SCHEDULE= lkml-tracker --date 2025-02-12
     #   docker compose run --rm -e CRON_SCHEDULE= lkml-tracker --date 2025-02-12 --llm
-
-  web:
-    image: nginx:alpine
-    container_name: lkml-web
-    restart: unless-stopped
-    ports:
-      - "8081:80"
-    volumes:
-      - ./reports:/usr/share/nginx/html:ro,z
-      - ./logs:/usr/share/nginx/logs:ro,z
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
 
   ollama:
     image: ollama/ollama:latest

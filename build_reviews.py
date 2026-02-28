@@ -287,6 +287,22 @@ def _render_node(node: dict, depth: int = 0) -> str:
         parts.append(f'<pre class="raw-body-text">{_esc(raw_body)}</pre>')
         parts.append('</details>')
 
+    # Reply-to label (text annotation; tree position is already shown structurally)
+    reply_to_text = node.get("reply_to", "")
+    if reply_to_text:
+        parts.append(
+            f'<div class="reply-to-label">&#8627; replying to {_esc(reply_to_text)}</div>'
+        )
+
+    # Lore link
+    message_id = node.get("message_id", "")
+    if message_id:
+        lore_url = f"https://lore.kernel.org/r/{_esc(message_id)}"
+        parts.append(
+            f'<a href="{lore_url}" target="_blank" rel="noopener" '
+            f'class="lore-link">View on lore &#8599;</a>'
+        )
+
     # Sentiment signals
     signals = node.get("sentiment_signals", [])
     if signals:
@@ -542,6 +558,22 @@ def build_review_html(data: dict) -> str:
             color: #444;
             border: 1px solid #e8e8e8;
         }}
+        .reply-to-label {{
+            font-size: 0.8em;
+            color: #999;
+            font-style: italic;
+            margin-top: 3px;
+        }}
+        .lore-link {{
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.82em;
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+            white-space: nowrap;
+        }}
+        .lore-link:hover {{ text-decoration: underline; color: #0056b3; }}
 
         .no-reviews {{
             color: #aaa;
@@ -560,7 +592,7 @@ def build_review_html(data: dict) -> str:
     </style>
 </head>
 <body>
-    <div class="home-link"><a href="../">&larr; Back to reports</a></div>
+    <div class="home-link"><a href="../index.html">&larr; Back to reports</a></div>
     <h1>{_esc(subject)}</h1>
     {'<div class="lore-link"><a href="' + _esc(url) + '" target="_blank">View on lore.kernel.org &rarr;</a></div>' if url else ''}
     {date_range}

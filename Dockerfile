@@ -37,6 +37,6 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 # Create volume mount points
-RUN mkdir -p /app/reports /app/.llm_cache /app/logs
+RUN mkdir -p /app/reports/logs /app/.llm_cache
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

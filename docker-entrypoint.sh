@@ -11,13 +11,13 @@ set -e
 # On Linux, set PUID/PGID to match your host user so files are created with
 # the correct ownership (e.g., PUID=1000 PGID=1000).
 
-LOG_DIR="/app/logs"
+LOG_DIR="/app/reports/logs"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 
 # --- Fix volume permissions first (as root, before anything else) ---
 # On Linux, bind-mounted dirs may be owned by root with restricted permissions.
 # Ensure they exist and are accessible.
-for dir in /app/reports /app/reports/reviews /app/.llm_cache "$LOG_DIR"; do
+for dir in /app/reports /app/reports/reviews /app/reports/logs /app/.llm_cache; do
     mkdir -p "$dir"
     chmod 777 "$dir" 2>/dev/null || true
     # Also fix any existing files inside
@@ -33,7 +33,7 @@ if [ -n "$PUID" ]; then
     id -u "$PUID" >/dev/null 2>&1 || useradd -u "$PUID" -g "$PGID" -M -s /bin/bash appuser
     USER_NAME=$(id -nu "$PUID")
     # Own the writable directories
-    chown -R "$PUID:$PGID" /app/reports /app/.llm_cache "$LOG_DIR" 2>/dev/null || true
+    chown -R "$PUID:$PGID" /app/reports /app/.llm_cache 2>/dev/null || true
     RUN_AS="$USER_NAME"
     echo "[entrypoint] Running as $USER_NAME (uid=$PUID gid=$PGID)"
 fi

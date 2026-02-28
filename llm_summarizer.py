@@ -1311,6 +1311,7 @@ def _summarize_patch_series_chunked(
     backend: "LLMBackend",
     cache: Optional[LLMCache] = None,
     dump_dir: Optional[Path] = None,
+    canonical_id: str = "",
 ) -> Optional[str]:
     """Summarize a multi-message patch series by calling the LLM per-message.
 
@@ -1322,12 +1323,13 @@ def _summarize_patch_series_chunked(
     """
     backend_label = f"{type(backend).__name__}({backend.model})"
     msg_date = _message_date_for_cache(activity_item, messages)
+    _canonical = canonical_id or activity_item.message_id
     summaries: List[str] = []
 
     for i, msg in enumerate(messages):
         suffix = f"patch_msg_{i}"
         msg_cache_key = _compute_per_reviewer_cache_key(
-            activity_item.message_id, messages, backend, suffix,
+            _canonical, messages, backend, suffix,
         )
         cached = cache.get(msg_cache_key, msg_date) if cache else None
 
@@ -1783,6 +1785,7 @@ def _analyze_per_reviewer(
     backend: "LLMBackend",
     cache: Optional[LLMCache] = None,
     dump_dir: Optional[Path] = None,
+    canonical_id: str = "",
 ) -> ConversationSummary:
     """Analyze a thread by decomposing into per-reviewer LLM calls.
 
@@ -1801,12 +1804,13 @@ def _analyze_per_reviewer(
     backend_label = f"{type(backend).__name__}({backend.model})"
     msg_date = _message_date_for_cache(activity_item, messages)
     participant_count = _count_participants_simple(messages)
+    _canonical = canonical_id or activity_item.message_id
 
     # --- Step 1: Patch Summary ---
     patch_summary = ""
     if is_patch:
         ps_cache_key = _compute_per_reviewer_cache_key(
-            activity_item.message_id, messages, backend, "patch_summary"
+            _canonical, messages, backend, "patch_summary"
         )
         cached_ps = cache.get(ps_cache_key, msg_date) if cache else None
 
@@ -1843,6 +1847,25 @@ def _analyze_per_reviewer(
     # --- Step 2: Per-Reviewer Analysis ---
     reviewer_groups = _group_messages_by_reviewer(messages)
     total_reviewers = len(reviewer_groups)
+
+    # If per-message grouping yields too many LLM calls, fall back to
+    # coarser author-level batching (all messages per author merged into
+    # char-limited batches).  This keeps thread analysis tractable for
+    # very large threads like the 53-message io_uring series that would
+    # otherwise produce 174 LLM calls.
+    if total_reviewers > _MAX_REVIEWER_GROUPS:
+        logger.info(
+            "Per-reviewer: %d groups exceeds cap (%d); "
+            "falling back to author-batched grouping",
+            total_reviewers, _MAX_REVIEWER_GROUPS,
+        )
+        reviewer_groups = _group_messages_by_author_batched(messages)
+        total_reviewers = len(reviewer_groups)
+        logger.info(
+            "Per-reviewer: author-batched grouping reduced to %d groups",
+            total_reviewers,
+        )
+
     patch_context_text = _build_patch_context_text(messages, max_chars=2000)
 
     reviewer_results: List[Dict] = []
@@ -1892,7 +1915,7 @@ def _analyze_per_reviewer(
 
         # Check per-reviewer cache
         rv_cache_key = _compute_per_reviewer_cache_key(
-            activity_item.message_id, messages, backend, f"reviewer_{cache_suffix}"
+            _canonical, messages, backend, f"reviewer_{cache_suffix}"
         )
         cached_rv = cache.get(rv_cache_key, msg_date) if cache else None
 
@@ -2174,6 +2197,7 @@ def analyze_thread_llm(
     cache: Optional[LLMCache] = None,
     dump_dir: Optional[Path] = None,
     force_monolithic: bool = False,
+    thread_root_id: str = "",
 ) -> ConversationSummary:
     """Analyze a thread using an LLM backend with heuristic fallback.
 
@@ -2196,6 +2220,11 @@ def analyze_thread_llm(
         summary.analysis_source = "heuristic"
         return summary
 
+    # Normalise the cache key to the thread root so all activity items within
+    # the same LKML thread share a single cache entry regardless of which
+    # per-message reply triggered the analysis.
+    canonical_id = thread_root_id or activity_item.message_id
+
     # Single-participant patch threads (e.g. patch series with no replies):
     # use chunked LLM calls for the patch summary, then fall through to the
     # normal per-reviewer LLM path below for any remaining messages.
@@ -2211,6 +2240,7 @@ def analyze_thread_llm(
             )
             llm_summary = _summarize_patch_series_chunked(
                 thread_messages, activity_item, backend, cache, dump_dir,
+                canonical_id=canonical_id,
             )
             if not llm_summary:
                 logger.warning(
@@ -2226,8 +2256,9 @@ def analyze_thread_llm(
             )
 
     # Check cache first — key includes backend+model so different LLMs
-    # don't share cached results.
-    cache_key = _compute_cache_key(activity_item.message_id, thread_messages, backend)
+    # don't share cached results.  Use canonical_id (thread root) so all
+    # activity items from the same thread hit the same cache entry.
+    cache_key = _compute_cache_key(canonical_id, thread_messages, backend)
     msg_date = _message_date_for_cache(activity_item, thread_messages)
     if cache:
         cached = cache.get(cache_key, msg_date)
@@ -2247,6 +2278,7 @@ def analyze_thread_llm(
         try:
             summary = _analyze_per_reviewer(
                 thread_messages, activity_item, backend, cache, dump_dir,
+                canonical_id=canonical_id,
             )
             # Cache the assembled result under the main cache key too
             if cache and summary.analysis_source == "llm-per-reviewer":

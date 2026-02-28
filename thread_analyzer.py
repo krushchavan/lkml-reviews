@@ -848,13 +848,82 @@ def _extract_review_comments(
             message_date=ymd,
         ))
 
-    # Sort: by date ascending, patch author last within each date
-    def sort_key(c: ReviewComment) -> tuple:
-        is_author = c.author.endswith("(author)")
-        return (c.message_date, is_author)
-
-    comments.sort(key=sort_key)
+    # Sort by date ascending.  Within the same date, preserve the original
+    # mbox (thread) order via Python's stable sort — this keeps the natural
+    # chronological reply chain intact (e.g. author explanation before the
+    # reviewer's acceptance reply on the same day).
+    comments.sort(key=lambda c: c.message_date)
     return comments[:max_comments]
+
+
+def filter_subtree_messages(
+    messages: List[Dict], root_message_id: str
+) -> List[Dict]:
+    """Return only messages in the reply sub-thread rooted at *root_message_id*.
+
+    When a PATCH_SUBMITTED cover letter is fetched from lore.kernel.org, the
+    returned thread contains *all* messages in the email thread — including the
+    individual patch submissions ([PATCH 1/N], [PATCH 2/N], …) and their own
+    review sub-threads (inline nits, acks, etc.).  This function prunes those
+    branches so that the analysis for a cover letter only sees the discussion
+    about the series as a whole, not per-patch discussions.
+
+    Rules
+    -----
+    * The root message is always included.
+    * Direct children of the root whose subject looks like an individual patch
+      submission (matches ``[PATCH N/M]`` with N > 0, no leading ``Re:``) are
+      pruned along with their entire sub-trees.
+    * All other descendants are included unconditionally.
+
+    Works generically for any root message:
+    * Cover letter ``[PATCH 0/N]``: keeps only the ``Re: [PATCH 0/N]`` discussion.
+    * Individual patch ``[PATCH K/N]``: keeps that patch and all its ``Re:`` replies.
+    * Any other root (discussion thread, RFC): keeps the full sub-tree.
+    """
+    root_id = root_message_id.strip("<>")
+
+    # Build lookup maps from the message list.
+    by_id: Dict[str, Dict] = {}
+    children_of: Dict[str, List[str]] = {}
+    for msg in messages:
+        mid = msg.get("message_id", "").strip("<>")
+        if not mid:
+            continue
+        by_id[mid] = msg
+        parent = msg.get("in_reply_to", "").strip("<>")
+        if parent:
+            children_of.setdefault(parent, []).append(mid)
+
+    # Detect individual patch submissions (e.g. "[PATCH 2/4] ...")
+    _INDIVIDUAL_PATCH_RE = re.compile(
+        r"\[(?:RFC\s+)?PATCH[^\]]*\s+[1-9]\d*/\d+\]", re.IGNORECASE
+    )
+
+    included: set = {root_id}
+    queue: List[str] = [root_id]
+
+    while queue:
+        current_id = queue.pop(0)
+        is_root_level = (current_id == root_id)
+        for child_id in children_of.get(current_id, []):
+            child_msg = by_id.get(child_id)
+            if child_msg is None:
+                continue
+            if is_root_level:
+                # Prune direct children that are individual patch submissions
+                # (they reply to the cover letter but are not review discussion).
+                subject = child_msg.get("subject", "")
+                is_re = bool(re.match(r"^Re:\s*", subject, re.IGNORECASE))
+                is_patch_submit = bool(_INDIVIDUAL_PATCH_RE.search(subject))
+                if is_patch_submit and not is_re:
+                    continue  # skip this branch entirely
+            included.add(child_id)
+            queue.append(child_id)
+
+    # Preserve original message order.
+    return [msg for msg in messages
+            if msg.get("message_id", "").strip("<>") in included]
 
 
 def analyze_thread(

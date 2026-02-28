@@ -89,7 +89,7 @@ from models import (
     Developer, DeveloperReport, LLMAnalysis, ReviewComment, Sentiment,
 )
 from report_generator import extract_reviews_data, generate_html_report, message_id_to_slug
-from thread_analyzer import analyze_thread
+from thread_analyzer import analyze_thread, filter_subtree_messages
 
 logger = logging.getLogger(__name__)
 
@@ -129,8 +129,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--logs-dir",
         type=str,
-        default="logs",
-        help="Directory for per-report log files. Default: logs/",
+        default=None,
+        help="Directory for per-report log files. Default: <output-dir>/logs/",
     )
     parser.add_argument(
         "--rate-limit",
@@ -200,7 +200,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         metavar="DIR",
-        help="Dump all raw LLM responses to DIR (errors always dumped to logs/llm_dumps/).",
+        help="Dump all raw LLM responses to DIR (errors always dumped to <output-dir>/logs/llm_dumps/).",
     )
     llm_group.add_argument(
         "--llm-monolithic",
@@ -546,6 +546,19 @@ def process_developer(
                     thread_messages = []
                     thread_cache[msg_id] = thread_messages
 
+            # Narrow the message list to the sub-thread rooted at this item's
+            # message_id.  For a cover letter this strips out the individual
+            # patch submissions ([PATCH 1/N] …) and their own review chains so
+            # the analysis only sees cover-letter discussion.  For individual
+            # patches or discussion threads the full sub-thread is preserved.
+            # Capture the thread root ID *before* filtering so all activity items
+            # within the same thread share a common LLM cache key.
+            thread_root_id = (
+                thread_messages[0].get("message_id", "").strip("<>")
+                if thread_messages else msg_id
+            )
+            thread_messages = filter_subtree_messages(thread_messages, msg_id)
+
             if llm_backends:
                 # Run each backend and collect attributed analyses
                 for backend_name, backend in llm_backends.items():
@@ -553,6 +566,7 @@ def process_developer(
                         thread_messages, item, backend, llm_cache,
                         dump_dir=llm_dump_dir,
                         force_monolithic=force_monolithic,
+                        thread_root_id=thread_root_id,
                     )
                     item.llm_analyses.append(LLMAnalysis(
                         backend=backend_name,
@@ -904,7 +918,7 @@ def generate_single_report(
         output_path = output_dir / f"{date_display}.html"
 
     # --- Set up per-report log file ---
-    logs_dir = Path(args.logs_dir)
+    logs_dir = Path(args.logs_dir) if args.logs_dir else output_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / f"{output_path.stem}.log"
 
@@ -1445,7 +1459,7 @@ def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None
         return
 
     reports_dir = Path(args.output_dir)
-    logs_dir = Path(args.logs_dir)
+    logs_dir = Path(args.logs_dir) if args.logs_dir else reports_dir / "logs"
     daily_dir = reports_dir / "daily"
 
     for target_date in target_dates:
@@ -1513,7 +1527,7 @@ def main():
     # --- Purge-only mode ---
     if args.purge_only:
         reports_dir = Path(args.output_dir)
-        logs_dir = Path(args.logs_dir)
+        logs_dir = Path(args.logs_dir) if args.logs_dir else reports_dir / "logs"
         purge_old_files(reports_dir, logs_dir, args.retention_days)
         return
 
@@ -1647,7 +1661,7 @@ def main():
 
     # Resolve publish settings once (used inside the per-day loop)
     reports_dir = Path(args.output_dir)
-    logs_dir = Path(args.logs_dir)
+    logs_dir = Path(args.logs_dir) if args.logs_dir else reports_dir / "logs"
     publish = args.publish_github
     publish_repo = ""
     publish_token = ""

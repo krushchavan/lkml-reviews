@@ -7,6 +7,7 @@ from typing import Optional
 
 from models import (
     ActivityItem,
+    ActivityType,
     ConversationSummary,
     DailyReport,
     DeveloperReport,
@@ -329,6 +330,73 @@ def _render_activity_item(
     return "\n".join(parts)
 
 
+def _series_key(message_id: str) -> str:
+    """Extract the series identifier from a message-id.
+
+    Kernel git-send-email format:
+      <hash>.1770821420.git.user@domain>  →  '1770821420.git.user@domain'
+      cover.1770821420.git.user@domain   →  '1770821420.git.user@domain'
+
+    All patches in the same ``git format-patch`` run share the same Unix
+    timestamp, so the suffix after the first component is the series key.
+    For Gmail / non-kernel IDs the full message-id is returned so each item
+    sorts independently.
+    """
+    mid = message_id.strip("<>")
+    m = re.match(r"(?:[0-9a-f]{10,}|cover)\.([\d]+\.git\..+)$", mid, re.IGNORECASE)
+    return m.group(1) if m else mid
+
+
+def _patch_num(subject: str) -> int:
+    """Return the X from '[PATCH X/Y]', or 0 for cover letters / standalone."""
+    s = re.sub(r"^(?:Re:\s*)+", "", subject, flags=re.IGNORECASE).strip()
+    m = re.search(r"\[(?:RFC\s+)?PATCH[^\]]*?\s+(\d+)/\d+\]", s, re.IGNORECASE)
+    return int(m.group(1)) if m else 0
+
+
+def _sort_activity_items(items: list[ActivityItem]) -> list[ActivityItem]:
+    """Sort activity items with series-aware grouping.
+
+    Patches that share a series key (the git-timestamp suffix common to all
+    message-ids produced by a single ``git format-patch`` run) are kept
+    together.  Groups themselves are sorted alphabetically by the subject of
+    their lowest-numbered patch so related patches stay in one block and
+    blocks appear in a predictable order.  Patches within a group are sorted
+    by patch number (0 = cover letter first, then 1, 2, 3 …).
+
+    Items whose message-ids do not follow the kernel format (Gmail, etc.)
+    each form their own one-item group and are interleaved alphabetically.
+    """
+    # Pre-compute sort metadata once per item.
+    def _meta(item: ActivityItem) -> tuple:
+        sk = _series_key(item.message_id)
+        num = _patch_num(item.subject)
+        # Normalised subject for alphabetical comparisons (strip Re: + tag).
+        s = re.sub(r"^(?:Re:\s*)+", "", item.subject, flags=re.IGNORECASE).strip()
+        s = re.sub(r"^\[.*?\]\s*", "", s).strip().lower()
+        return sk, num, s
+
+    meta = {id(item): _meta(item) for item in items}
+
+    # Group items by series key.
+    groups: dict[str, list[ActivityItem]] = {}
+    for item in items:
+        sk = meta[id(item)][0]
+        groups.setdefault(sk, []).append(item)
+
+    # Within each group sort by (patch_num, normalised_subject).
+    for grp in groups.values():
+        grp.sort(key=lambda i: (meta[id(i)][1], meta[id(i)][2]))
+
+    # Sort groups by the normalised subject of the first (lowest-numbered) item.
+    sorted_groups = sorted(
+        groups.values(),
+        key=lambda grp: meta[id(grp[0])][2],
+    )
+
+    return [item for grp in sorted_groups for item in grp]
+
+
 def _render_activity_section(
     items: list[ActivityItem], title: str, section_type: str,
     open_by_default: bool = False,
@@ -344,7 +412,7 @@ def _render_activity_section(
     if count == 0:
         parts.append('<div class="no-activity">No activity</div>')
     else:
-        for item in items:
+        for item in _sort_activity_items(items):
             parts.append(_render_activity_item(
                 item, section_type, review_links=review_links, report_date=report_date
             ))
@@ -499,6 +567,24 @@ def _render_statistics(report: DailyReport) -> str:
     """
 
 
+def _normalize_patch_subject(subject: str) -> str:
+    """Strip 'Re:' prefix only, return lowercase subject.
+
+    Used to match PATCH_REVIEWED/PATCH_ACKED items (whose subject starts with
+    'Re: [PATCH...]') back to their originating PATCH_SUBMITTED item so their
+    review data lands in the same per-patchset JSON file rather than a separate
+    orphan file.
+
+    The [PATCH vN X/Y] tag is intentionally preserved so that replies to
+    individual patches within a series (e.g. 'Re: [PATCH 1/4] ...') do NOT
+    match the cover letter ('[PATCH 0/4] ...').  Only a direct cover-letter
+    reply ('Re: [PATCH 0/4] same title') matches the cover letter's slug.
+    """
+    # Strip one or more leading "Re:" prefixes; keep everything else intact
+    s = re.sub(r"^(?:Re:\s*)+", "", subject, flags=re.IGNORECASE).strip()
+    return s.lower()
+
+
 def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> list[dict]:
     """Extract review comment data from a DailyReport for JSON serialization.
 
@@ -518,6 +604,15 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
     """
     results = []
     for dr in daily_report.developer_reports:
+        # Build a normalized-title → PATCH_SUBMITTED item map so that
+        # PATCH_REVIEWED/PATCH_ACKED replies with matching subjects can be
+        # routed to the original patch's review JSON instead of a separate file.
+        patch_by_norm_subject: dict[str, ActivityItem] = {}
+        for p in dr.patches_submitted:
+            norm = _normalize_patch_subject(p.subject)
+            if norm:
+                patch_by_norm_subject[norm] = p
+
         all_items = (
             dr.patches_submitted + dr.patches_reviewed + dr.patches_acked
             + dr.discussions_posted
@@ -526,6 +621,27 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
             conv = item.conversation
             if not conv or not conv.review_comments:
                 continue
+
+            # For "Re: [PATCH ...] <title>" replies, try to find the originating
+            # patch submission so the review data merges into that patch's JSON.
+            effective_item = item
+            if (
+                item.activity_type in (ActivityType.PATCH_REVIEWED, ActivityType.PATCH_ACKED)
+                and re.match(r"^Re:\s*", item.subject, re.IGNORECASE)
+            ):
+                norm = _normalize_patch_subject(item.subject)
+                matched_patch = patch_by_norm_subject.get(norm)
+                if matched_patch:
+                    effective_item = matched_patch
+
+            # Strip leading "Re:" for display when no match was found (reviewing
+            # someone else's patch — keep the slug as-is but show a clean title).
+            display_subject = effective_item.subject
+            if effective_item is item and re.match(r"^Re:\s*", item.subject, re.IGNORECASE):
+                display_subject = re.sub(
+                    r"^(?:Re:\s*)+", "", item.subject, flags=re.IGNORECASE
+                ).strip()
+
             reviews = []
             for rc in conv.review_comments:
                 reviews.append({
@@ -539,12 +655,13 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                     "raw_body": rc.raw_body,
                     "reply_to": rc.reply_to,
                     "message_date": rc.message_date,
+                    "message_id": getattr(rc, "message_id", "") or "",
                 })
             results.append({
-                "message_id": item.message_id,
-                "slug": message_id_to_slug(item.message_id),
-                "subject": item.subject,
-                "url": item.url,
+                "message_id": effective_item.message_id,
+                "slug": message_id_to_slug(effective_item.message_id),
+                "subject": display_subject,
+                "url": effective_item.url,
                 "developer": dr.developer.name,
                 "date": daily_report.date,
                 "report_file": report_filename,
@@ -1177,7 +1294,7 @@ def generate_html_report(
     <h1>LKML Activity Report{' <span class="llm-badge">LLM: ' + _esc(llm_label) + '</span>' if llm_label else ''}</h1>
     <h2>{_esc(daily_report.date)} &mdash; Generated {_esc(now)}</h2>
     {'<p class="analysis-mode">Analysis: LLM-enriched (' + _esc(llm_label) + ')</p>' if llm_label else '<p class="analysis-mode">Analysis: Heuristic</p>'}
-    {'<p class="log-link"><a href="/logs/' + _esc(log_filename) + '">View generation log</a></p>' if log_filename else ''}
+    {'<p class="log-link"><a href="logs/' + _esc(log_filename) + '">View generation log</a></p>' if log_filename else ''}
     {progress_html}
 
     {stats_section}
@@ -1189,7 +1306,7 @@ def generate_html_report(
         &bull; {len(daily_report.developer_reports)} developers tracked
         &bull; Data from lore.kernel.org
         {'&bull; LLM: ' + _esc(llm_label) if llm_label else '&bull; Heuristic analysis'}
-        {'&bull; <a href="/logs/' + _esc(log_filename) + '">Log</a>' if log_filename else ''}
+        {'&bull; <a href="logs/' + _esc(log_filename) + '">Log</a>' if log_filename else ''}
     </footer>
 </body>
 </html>"""
