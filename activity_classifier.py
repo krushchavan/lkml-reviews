@@ -119,8 +119,16 @@ def _normalize_series_title(title: str) -> str:
     Strips version numbers and patch numbers so v5 and v6 of the same
     series can be grouped together.
     """
-    normalized = re.sub(r"\[(?:RFC\s+)?PATCH[^\]]*\]", "[PATCH]", title)
+    normalized = re.sub(
+        r"\[(?:RFC\s+)?PATCH[^\]]*\]|\[RFC(?:\s+v\d+)?\s+\d+/\d+[^\]]*\]",
+        "[PATCH]", title, flags=re.IGNORECASE)
     return normalized.strip()
+
+
+def _extract_patch_version(subject: str) -> int:
+    """Return the version number from '[PATCH v3 ...]', or 1 if unversioned."""
+    m = re.search(r"\[(?:(?:RFC\s+)?PATCH|RFC)\s+v(\d+)", subject, re.IGNORECASE)
+    return int(m.group(1)) if m else 1
 
 
 def _deduplicate_patches(items: List[ActivityItem]) -> List[ActivityItem]:
@@ -150,15 +158,19 @@ def _deduplicate_patches(items: List[ActivityItem]) -> List[ActivityItem]:
         best = None
         total_patches = None
         for item in group:
-            cover_match = re.search(r"\[(?:RFC\s+)?PATCH[^\]]*\s+0/(\d+)\]", item.subject)
-            first_match = re.search(r"\[(?:RFC\s+)?PATCH[^\]]*\s+1/(\d+)\]", item.subject)
+            cover_match = re.search(
+                r"\[(?:RFC\s+)?PATCH[^\]]*\s+0/(\d+)\]|\[RFC[^\]]*\b0/(\d+)\]",
+                item.subject, re.IGNORECASE)
+            first_match = re.search(
+                r"\[(?:RFC\s+)?PATCH[^\]]*\s+1/(\d+)\]|\[RFC[^\]]*\b1/(\d+)\]",
+                item.subject, re.IGNORECASE)
             if cover_match:
                 best = item
-                total_patches = int(cover_match.group(1))
+                total_patches = int(cover_match.group(1) or cover_match.group(2))
                 break
             elif first_match and best is None:
                 best = item
-                total_patches = int(first_match.group(1))
+                total_patches = int(first_match.group(1) or first_match.group(2))
 
         if best is None:
             best = group[0]
@@ -178,10 +190,40 @@ def _deduplicate_patches(items: List[ActivityItem]) -> List[ActivityItem]:
     result: List[ActivityItem] = []
     for norm, group in title_groups.items():
         if len(group) == 1:
-            result.append(group[0])
+            item = group[0]
+            # Preserve an already-populated version_history (e.g. set by a previous
+            # dedup pass on the lookback window).  Only seed it when empty.
+            if not item.version_history:
+                item.version_history = [{
+                    "version": item.patch_version,
+                    "message_id": item.message_id,
+                    "url": item.url,
+                    "subject": item.subject,
+                    "date": item.date or "",
+                }]
+            result.append(item)
         else:
-            # Keep the one with the highest version number, or latest date
+            # Keep the one with the latest date as representative.
             best = max(group, key=lambda x: x.date or "")
+            # Merge version_history from every item in the group.  Items that were
+            # themselves representatives of a previous dedup pass (e.g. the lookback
+            # dedup) may already carry accumulated histories — honour those so that
+            # a chain like v2→v3 doesn't lose v2 when it meets v4.
+            all_versions: dict[int, dict] = {}
+            for item in group:
+                if item.version_history:
+                    for vh in item.version_history:
+                        all_versions[vh["version"]] = vh
+                else:
+                    ver = _extract_patch_version(item.subject)
+                    all_versions[ver] = {
+                        "version": ver,
+                        "message_id": item.message_id,
+                        "url": item.url,
+                        "subject": item.subject,
+                        "date": item.date or "",
+                    }
+            best.version_history = sorted(all_versions.values(), key=lambda v: v["version"])
             result.append(best)
 
     return result
@@ -197,7 +239,8 @@ def extract_patch_submissions(entries: List[dict]) -> List[dict]:
     for entry in entries:
         title = entry.get("title", "")
         is_reply = bool(re.match(r"^Re:\s*", title, re.IGNORECASE))
-        has_patch_tag = bool(re.search(r"\[(?:RFC\s+)?PATCH", title))
+        has_patch_tag = bool(re.search(
+            r"\[(?:RFC\s+)?PATCH|\[RFC(?:\s+v\d+)?\s+\d+/\d+", title, re.IGNORECASE))
         if not is_reply and has_patch_tag:
             patches.append(entry)
     return patches
@@ -300,7 +343,8 @@ def classify_messages(
             url = f"https://lore.kernel.org/all/{msg_id}/"
 
         is_reply = bool(re.match(r"^Re:\s*", title, re.IGNORECASE))
-        has_patch_tag = bool(re.search(r"\[(?:RFC\s+)?PATCH", title))
+        has_patch_tag = bool(re.search(
+            r"\[(?:RFC\s+)?PATCH|\[RFC(?:\s+v\d+)?\s+\d+/\d+", title, re.IGNORECASE))
 
         if not is_reply and has_patch_tag:
             # Patch submission (includes [RFC PATCH ...])
@@ -310,6 +354,7 @@ def classify_messages(
                 message_id=msg_id,
                 url=url,
                 date=updated,
+                patch_version=_extract_patch_version(title),
             ))
             logger.debug("PATCH: %s", title)
 

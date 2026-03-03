@@ -75,6 +75,7 @@ from activity_classifier import (
     classify_messages,
     extract_patch_submissions,
     _deduplicate_patches,
+    _extract_patch_version,
 )
 from lkml_client import LKMLAPIError, LKMLClient
 from llm_cache import LLMCache
@@ -480,6 +481,7 @@ def process_developer(
                 date=updated,
                 is_ongoing=True,
                 submitted_date=_parse_submission_date(updated),
+                patch_version=_extract_patch_version(title),
             ))
 
         recent_items = _deduplicate_patches(recent_items)
@@ -518,8 +520,11 @@ def process_developer(
                 len(ongoing_patches),
                 date_display,
             )
-            # Append ongoing patches after the report date's patches
+            # Merge ongoing patches with the report date's patches, then run a final
+            # cross-version dedup so that e.g. day's v4 absorbs lookback's v2→v3
+            # representative, producing a single entry with version_history=[v2,v3,v4].
             report.patches_submitted.extend(ongoing_patches)
+            report.patches_submitted = _deduplicate_patches(report.patches_submitted)
     else:
         thread_cache = {}
 
@@ -621,6 +626,8 @@ def _serialize_daily_report(
             "ack_type": item.ack_type,
             "is_ongoing": item.is_ongoing,
             "submitted_date": item.submitted_date,
+            "patch_version": item.patch_version,
+            "version_history": item.version_history,
             "patch_summary": conv.patch_summary if conv else "",
             "analysis_source": conv.analysis_source if conv else "heuristic",
             "review_comments": rc_list,
@@ -806,6 +813,45 @@ def _write_review_jsons(
         logger.info(
             "Saved review data for %d patchsets to %s", len(reviews_data), reviews_dir
         )
+
+    # Write minimal review JSONs for older versions that were deduplicated away,
+    # so each version has its own detail page and can be linked from the main report.
+    for dr in daily_report.developer_reports:
+        for item in dr.patches_submitted:
+            if len(item.version_history) <= 1:
+                continue
+            report_date = item.date[:10] if item.date else ""
+            report_file = report_filename
+            for vh in item.version_history:
+                if vh["message_id"] == item.message_id:
+                    continue  # representative already handled above
+                old_msg_id = vh["message_id"]
+                old_slug = message_id_to_slug(old_msg_id)
+                review_links[old_msg_id] = old_slug
+                old_json_path = reviews_dir / f"{old_slug}.json"
+                if not old_json_path.exists():
+                    vh_date = vh.get("date", "")
+                    vh_date_short = vh_date[:10] if vh_date else report_date
+                    minimal = {
+                        "thread_id": old_msg_id,
+                        "subject": vh["subject"],
+                        "url": vh["url"],
+                        "dates": {
+                            vh_date_short or report_date: {
+                                "report_file": report_file,
+                                "developer": dr.developer.name,
+                                "reviews": [],
+                            }
+                        },
+                    }
+                    old_json_path.write_text(
+                        json.dumps(minimal, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                    logger.debug(
+                        "Wrote minimal review JSON for older version v%d: %s",
+                        vh["version"], old_slug,
+                    )
 
     return review_links
 

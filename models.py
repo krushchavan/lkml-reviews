@@ -95,6 +95,10 @@ class ActivityItem:
     in_reply_to: Optional[str] = None
     ack_type: Optional[str] = None
     series_patch_count: Optional[int] = None
+    # Version tracking: populated by dedup logic when multiple revisions of the same
+    # series are found (e.g. v1, v2, v3 → representative keeps all version info).
+    patch_version: int = 1  # This item's version number (1 if no "vN" in subject)
+    version_history: list = field(default_factory=list)  # [{version, message_id, url, subject, date}, ...]
     conversation: Optional[ConversationSummary] = None
     # For ongoing patches: submitted in last 14 days but with activity today
     is_ongoing: bool = False

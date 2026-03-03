@@ -314,6 +314,21 @@ def _render_activity_item(
     if item.series_patch_count and item.series_patch_count > 1:
         parts.append(f'<span class="patch-count">{item.series_patch_count} patches</span>')
 
+    # Version chain: shown when multiple revisions of the same series were found
+    if len(item.version_history) > 1:
+        parts.append('<span class="version-chain">')
+        for i, vh in enumerate(item.version_history):
+            ver_label = f"v{vh['version']}"
+            is_latest = (i == len(item.version_history) - 1)
+            # Link older versions to their own detail page (if available) or lore URL
+            ver_slug = review_links.get(vh["message_id"]) if review_links else None
+            ver_href = _esc(f"reviews/{ver_slug}.html") if ver_slug else _esc(vh["url"])
+            css = "version-badge latest" if is_latest else "version-badge"
+            parts.append(f'<a href="{ver_href}" class="{css}" target="_blank">{ver_label}</a>')
+            if not is_latest:
+                parts.append('<span class="version-arrow">\u2192</span>')
+        parts.append('</span>')
+
     review_link = _get_review_link(item, review_links, report_date)
 
     # Multi-LLM analyses (when --llm-all produces multiple results)
@@ -930,6 +945,38 @@ def generate_html_report(
             margin-left: 8px;
             background: #e8daef;
             color: #6c3483;
+        }}
+        .version-chain {{
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }}
+        .version-badge {{
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: 600;
+            background: #e8e8e8;
+            color: #555;
+            text-decoration: none;
+        }}
+        .version-badge:hover {{
+            background: #d0d0d0;
+        }}
+        .version-badge.latest {{
+            background: #d4edda;
+            color: #155724;
+        }}
+        .version-badge.latest:hover {{
+            background: #b8dfc5;
+        }}
+        .version-arrow {{
+            font-size: 0.75em;
+            color: #aaa;
+            line-height: 1;
         }}
         .conversation-summary {{
             margin-top: 6px;
