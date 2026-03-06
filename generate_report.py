@@ -37,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from build_index import build_index
+from build_index import build_index, write_log_viewer
 from build_reviews import build_all_reviews
 
 
@@ -530,7 +530,22 @@ def process_developer(
 
     # Fetch threads for conversation summaries on all items
     if not skip_threads:
-        all_items = report.patches_submitted + reviews + acks + report.discussions_posted
+        # Include individual series patches so each gets its own LLM analysis
+        # and review detail page.  They are stored on the cover letter's
+        # series_items field and must be processed after the cover letter so
+        # the thread is already in thread_cache (shared fetch).
+        series_sub_items = [
+            si
+            for patch in report.patches_submitted
+            for si in patch.series_items
+        ]
+        all_items = (
+            report.patches_submitted
+            + series_sub_items
+            + reviews
+            + acks
+            + report.discussions_posted
+        )
         total_items = len(all_items)
 
         for item_idx, item in enumerate(all_items, 1):
@@ -546,6 +561,11 @@ def process_developer(
                     result = client.get_thread(msg_id)
                     thread_messages = result.get("messages", [])
                     thread_cache[msg_id] = thread_messages
+                    # Pre-populate cache for individual series patches so they
+                    # share this fetch and avoid redundant HTTP requests.
+                    for si in item.series_items:
+                        if si.message_id not in thread_cache:
+                            thread_cache[si.message_id] = thread_messages
                 except LKMLAPIError as e:
                     logger.debug("  Thread fetch failed for %s: %s", msg_id, e)
                     thread_messages = []
@@ -564,6 +584,19 @@ def process_developer(
             )
             thread_messages = filter_subtree_messages(thread_messages, msg_id)
 
+            # Individual patches in a series (PATCH N/M, N>0) share the same
+            # thread_root_id (the cover letter) as the cover letter itself, which
+            # would cause them all to hit the cover letter's LLM cache entry and
+            # return the cover-letter-level analysis instead of their own per-patch
+            # analysis.  Override thread_root_id to the patch's own message_id so
+            # each individual patch gets its own distinct cache entry.
+            effective_cache_id = (
+                msg_id
+                if (item.activity_type == ActivityType.PATCH_SUBMITTED
+                    and thread_root_id != msg_id)
+                else thread_root_id
+            )
+
             if llm_backends:
                 # Run each backend and collect attributed analyses
                 for backend_name, backend in llm_backends.items():
@@ -571,7 +604,7 @@ def process_developer(
                         thread_messages, item, backend, llm_cache,
                         dump_dir=llm_dump_dir,
                         force_monolithic=force_monolithic,
-                        thread_root_id=thread_root_id,
+                        thread_root_id=effective_cache_id,
                     )
                     item.llm_analyses.append(LLMAnalysis(
                         backend=backend_name,
@@ -628,6 +661,7 @@ def _serialize_daily_report(
             "submitted_date": item.submitted_date,
             "patch_version": item.patch_version,
             "version_history": item.version_history,
+            "series_items": [_serialize_item(si) for si in item.series_items],
             "patch_summary": conv.patch_summary if conv else "",
             "analysis_source": conv.analysis_source if conv else "heuristic",
             "review_comments": rc_list,
@@ -692,7 +726,7 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
             analysis_source=d.get("analysis_source", "heuristic"),
         )
 
-        return ActivityItem(
+        item = ActivityItem(
             activity_type=act_type,
             subject=d.get("subject", ""),
             message_id=d.get("message_id", ""),
@@ -704,6 +738,9 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
             submitted_date=d.get("submitted_date"),
             conversation=conv,
         )
+        # Recursively deserialize individual patches in a series.
+        item.series_items = [_load_item(si) for si in d.get("series_items", [])]
+        return item
 
     report = DailyReport(
         date=data["date"],
@@ -853,6 +890,72 @@ def _write_review_jsons(
                         vh["version"], old_slug,
                     )
 
+    # Write review JSONs for each individual series patch (1/N … N/N).
+    # These may have their own LLM analyses from the series_sub_items processing.
+    for dr in daily_report.developer_reports:
+        for item in dr.patches_submitted:
+            if not item.series_items:
+                continue
+            report_date = item.date[:10] if item.date else ""
+            for si in item.series_items:
+                si_slug = message_id_to_slug(si.message_id)
+                review_links[si.message_id] = si_slug
+                si_json_path = reviews_dir / f"{si_slug}.json"
+                si_date = si.date[:10] if si.date else report_date
+                # Build full or minimal JSON depending on whether LLM ran.
+                if si.conversation:
+                    si_conv = si.conversation
+                    si_rc_list = []
+                    for rc in si_conv.review_comments:
+                        si_rc_list.append({
+                            "author": rc.author,
+                            "summary": rc.summary,
+                            "sentiment": rc.sentiment.value.upper(),
+                            "sentiment_signals": rc.sentiment_signals,
+                            "has_inline_review": rc.has_inline_review,
+                            "tags_given": rc.tags_given,
+                            "raw_body": rc.raw_body,
+                            "reply_to": rc.reply_to,
+                            "message_date": rc.message_date,
+                            "message_id": rc.message_id,
+                            "analysis_source": rc.analysis_source,
+                        })
+                    date_entry: dict = {
+                        "report_file": report_filename,
+                        "developer": dr.developer.name,
+                        "reviews": si_rc_list,
+                        "analysis_source": si_conv.analysis_source,
+                    }
+                    if si_conv.patch_summary:
+                        date_entry["patch_summary"] = si_conv.patch_summary
+                else:
+                    date_entry = {
+                        "report_file": report_filename,
+                        "developer": dr.developer.name,
+                        "reviews": [],
+                    }
+                # Merge with existing JSON if present (same as main loop).
+                if si_json_path.exists():
+                    try:
+                        existing = json.loads(si_json_path.read_text(encoding="utf-8"))
+                        dates = existing.get("dates", {})
+                    except Exception:
+                        dates = {}
+                else:
+                    dates = {}
+                dates[si_date] = date_entry
+                si_merged = {
+                    "thread_id": si.message_id,
+                    "subject": si.subject,
+                    "url": si.url,
+                    "dates": dates,
+                }
+                si_json_path.write_text(
+                    json.dumps(si_merged, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                logger.debug("Wrote series patch review JSON: %s", si_slug)
+
     return review_links
 
 
@@ -921,6 +1024,7 @@ def _write_incremental_update(
 
     # 4. Rebuild index so the in-progress badge appears
     try:
+        write_log_viewer(reports_dir)
         index_html = build_index(reports_dir, logs_dir)
         (reports_dir / "index.html").write_text(index_html, encoding="utf-8")
     except Exception as e:
@@ -1552,6 +1656,7 @@ def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None
         build_all_reviews(reports_dir)
 
         logger.info("Rebuilding index...")
+        write_log_viewer(reports_dir)
         index_html = build_index(reports_dir, logs_dir)
         (reports_dir / "index.html").write_text(index_html, encoding="utf-8")
         logger.info("Index updated.")
@@ -1751,6 +1856,7 @@ def main():
         build_all_reviews(reports_dir)
 
         logger.info("Rebuilding index...")
+        write_log_viewer(reports_dir)
         index_html = build_index(reports_dir, logs_dir)
         index_path = reports_dir / "index.html"
         index_path.write_text(index_html, encoding="utf-8")
@@ -1777,6 +1883,7 @@ def main():
         purge_old_files(reports_dir, logs_dir, args.retention_days)
         # Rebuild index once more after purge to reflect any removed entries
         logger.info("Rebuilding index after purge...")
+        write_log_viewer(reports_dir)
         index_html = build_index(reports_dir, logs_dir)
         index_path.write_text(index_html, encoding="utf-8")
         if publish:

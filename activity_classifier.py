@@ -177,6 +177,30 @@ def _deduplicate_patches(items: List[ActivityItem]) -> List[ActivityItem]:
             total_patches = len(group)
 
         best.series_patch_count = total_patches
+
+        # Store individual patches (1/N … N/N) on the representative so the
+        # report can render them as a collapsible sub-list.  Exclude the cover
+        # letter itself (0/N) and sort by patch number.
+        _PATCH_NUM_RE = re.compile(
+            r"\[(?:RFC\s+)?PATCH[^\]]*\s+(\d+)/\d+\]|\[RFC[^\]]*\b(\d+)/\d+\]",
+            re.IGNORECASE,
+        )
+
+        def _patch_num(it: ActivityItem) -> int:
+            m = _PATCH_NUM_RE.search(it.subject)
+            return int(m.group(1) or m.group(2)) if m else 999
+
+        new_series_items = sorted(
+            [it for it in group if it is not best],
+            key=_patch_num,
+        )
+        # Only overwrite series_items when the group actually contains individual
+        # patches.  On subsequent dedup passes (e.g. the final cross-day dedup
+        # after extend()) the individual patches are no longer in the flat list —
+        # they were already stashed in series_items by a previous pass.  Without
+        # this guard the second pass would overwrite series_items with [].
+        if new_series_items:
+            best.series_items = new_series_items
         phase1_results.append(best)
 
     phase1_results.extend(ungrouped)

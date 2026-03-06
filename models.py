@@ -99,6 +99,10 @@ class ActivityItem:
     # series are found (e.g. v1, v2, v3 → representative keeps all version info).
     patch_version: int = 1  # This item's version number (1 if no "vN" in subject)
     version_history: list = field(default_factory=list)  # [{version, message_id, url, subject, date}, ...]
+    # Individual patches in this series (cover letter representative only).
+    # Populated by _deduplicate_patches() with ActivityItems for patches 1/N … N/N,
+    # sorted by patch number.  Empty for individual patches and non-series items.
+    series_items: list = field(default_factory=list)
     conversation: Optional[ConversationSummary] = None
     # For ongoing patches: submitted in last 14 days but with activity today
     is_ongoing: bool = False

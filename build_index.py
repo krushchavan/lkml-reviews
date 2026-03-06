@@ -160,7 +160,7 @@ def _build_run_history_html(logs_dir: Path) -> str:
             status_html = f'<span class="status-fail" title="{title}">FAIL</span>'
 
         report_link = f'<a href="{html.escape(report_file)}">{html.escape(report_date)}</a>' if report_file else report_date
-        log_link = f'<a href="logs/{html.escape(log_file)}" class="log-link">Log</a>' if log_file else "--"
+        log_link = f'<a href="log_viewer.html?log={html.escape(log_file)}" class="log-link">Log</a>' if log_file else "--"
 
         rows.append(
             f"<tr>"
@@ -311,7 +311,7 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             log_file = _match_log(report_file, log_files, logs_by_date)
             if log_file:
                 matched_logs.add(log_file)
-                log_link = f'<a href="logs/{html.escape(log_file)}" class="log-link">Log</a>'
+                log_link = f'<a href="log_viewer.html?log={html.escape(log_file)}" class="log-link">Log</a>'
             else:
                 log_link = '<span class="none">--</span>'
 
@@ -657,6 +657,282 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
 </html>"""
 
 
+LOG_VIEWER_HTML = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+    }
+    /* ── Toolbar ── */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    #back-link {
+      color: #58a6ff;
+      text-decoration: none;
+      font-size: 0.85em;
+      white-space: nowrap;
+    }
+    #back-link:hover { text-decoration: underline; }
+    #logname {
+      flex: 1;
+      color: #8b949e;
+      font-size: 0.82em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #linecount { color: #6e7681; font-size: 0.78em; white-space: nowrap; }
+    #status {
+      font-size: 0.78em;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    #status.following { background: #122d12; color: #56d364; border: 1px solid #238636; }
+    #status.paused    { background: #3d1a00; color: #f0883e; border: 1px solid #9e3d00; }
+    .sep { color: #30363d; }
+    /* ── Buttons ── */
+    .btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 3px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.8em;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #30363d; }
+    .btn.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
+    /* ── Log lines area ── */
+    #log-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 14px 40px;
+    }
+    .line {
+      display: block;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-all;
+      padding: 1px 0;
+    }
+    .line:hover { background: rgba(255,255,255,0.04); }
+    /* timestamp + level coloring */
+    .ts  { color: #484f58; }
+    .lvl-debug   { color: #484f58; }
+    .lvl-info    { color: #58a6ff; }
+    .lvl-warning { color: #e3b341; }
+    .lvl-error   { color: #f85149; font-weight: 600; }
+    /* full-line dim for DEBUG lines */
+    .line-debug  { color: #484f58; }
+    .line-info   { color: #c9d1d9; }
+    .line-warning { color: #e3b341; }
+    .line-error  { color: #f85149; }
+    /* empty / loading states */
+    #empty-msg {
+      margin-top: 60px;
+      text-align: center;
+      color: #484f58;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <a id="back-link" href="index.html">&#8592; Index</a>
+    <span class="sep">|</span>
+    <span id="logname">Loading…</span>
+    <span id="linecount"></span>
+    <span id="status" class="following">&#x2B07; Following</span>
+    <span class="sep">|</span>
+    <button class="btn" id="btn-tail" onclick="toggleTail()">Pause</button>
+    <span class="sep">|</span>
+    <span style="color:#6e7681;font-size:0.78em">Refresh:</span>
+    <button class="btn active" id="iv-2" onclick="setIv(2000,this)">2s</button>
+    <button class="btn" id="iv-5"  onclick="setIv(5000,this)">5s</button>
+    <button class="btn" id="iv-10" onclick="setIv(10000,this)">10s</button>
+    <button class="btn" id="iv-off" onclick="setIv(0,this)">Off</button>
+  </div>
+  <div id="log-output">
+    <div id="empty-msg">Loading log…</div>
+  </div>
+
+  <script>
+    // ── Query param ──────────────────────────────────────────────
+    const params  = new URLSearchParams(location.search);
+    const logName = params.get("log") || "";
+    const logUrl  = logName ? "logs/" + logName : "";
+
+    document.title = logName ? "Log: " + logName : "Log Viewer";
+    document.getElementById("logname").textContent = logName || "(no log specified)";
+
+    // ── State ────────────────────────────────────────────────────
+    let knownLines   = 0;   // number of lines already rendered
+    let tailing      = true;
+    let intervalMs   = 2000;
+    let timerId      = null;
+    let firstLoad    = true;
+
+    const output = document.getElementById("log-output");
+    const empty  = document.getElementById("empty-msg");
+
+    // ── Line parser / renderer ───────────────────────────────────
+    const LINE_RE = /^(\d{2}:\d{2}:\d{2}\s+\S+)\s+\[(DEBUG|INFO|WARNING|ERROR)\]\s*([\s\S]*)$/i;
+
+    function renderLine(raw) {
+      const span = document.createElement("span");
+      span.className = "line";
+      const m = LINE_RE.exec(raw);
+      if (m) {
+        const [, ts, lvl, msg] = m;
+        const lvlLow = lvl.toLowerCase();
+        span.classList.add("line-" + lvlLow);
+        span.innerHTML =
+          '<span class="ts">' + escHtml(ts) + "</span> " +
+          '<span class="lvl-' + lvlLow + '">[' + escHtml(lvl) + "]</span> " +
+          escHtml(msg);
+      } else {
+        span.textContent = raw;
+      }
+      return span;
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    // ── Fetch + update ───────────────────────────────────────────
+    async function fetchLog() {
+      if (!logUrl) return;
+      try {
+        const resp = await fetch(logUrl, { cache: "no-store" });
+        if (!resp.ok) {
+          showError("HTTP " + resp.status + " — " + resp.statusText);
+          return;
+        }
+        const text = await resp.text();
+        const lines = text.split("\\n");
+        // strip trailing empty line from final newline
+        if (lines.length && lines[lines.length - 1] === "") lines.pop();
+
+        if (lines.length > knownLines) {
+          if (firstLoad && empty) empty.remove();
+          firstLoad = false;
+
+          const frag = document.createDocumentFragment();
+          for (let i = knownLines; i < lines.length; i++) {
+            frag.appendChild(renderLine(lines[i]));
+            frag.appendChild(document.createTextNode("\\n"));
+          }
+          output.appendChild(frag);
+          knownLines = lines.length;
+
+          document.getElementById("linecount").textContent =
+            knownLines.toLocaleString() + " lines";
+
+          if (tailing) scrollToBottom();
+        }
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    function showError(msg) {
+      if (empty) {
+        empty.textContent = "Error loading log: " + msg;
+        empty.style.color = "#f85149";
+      }
+    }
+
+    // ── Scroll detection (auto-pause / auto-resume) ──────────────
+    function isAtBottom() {
+      return output.scrollHeight - output.scrollTop - output.clientHeight < 30;
+    }
+
+    output.addEventListener("scroll", () => {
+      if (isAtBottom()) {
+        if (!tailing) resumeTail();
+      } else {
+        if (tailing) pauseTail();
+      }
+    }, { passive: true });
+
+    function scrollToBottom() {
+      output.scrollTop = output.scrollHeight;
+    }
+
+    // ── Tail controls ─────────────────────────────────────────────
+    function pauseTail() {
+      tailing = false;
+      const st = document.getElementById("status");
+      st.textContent = "\\u23F8 Paused";
+      st.className = "paused";
+      document.getElementById("btn-tail").textContent = "Resume";
+    }
+
+    function resumeTail() {
+      tailing = true;
+      const st = document.getElementById("status");
+      st.textContent = "\\u2B07 Following";
+      st.className = "following";
+      document.getElementById("btn-tail").textContent = "Pause";
+      scrollToBottom();
+    }
+
+    function toggleTail() {
+      if (tailing) pauseTail(); else resumeTail();
+    }
+
+    // ── Interval selector ─────────────────────────────────────────
+    function setIv(ms, btn) {
+      intervalMs = ms;
+      document.querySelectorAll(".btn[id^='iv-']").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      clearInterval(timerId);
+      if (ms > 0) timerId = setInterval(fetchLog, ms);
+    }
+
+    // ── Boot ──────────────────────────────────────────────────────
+    fetchLog();
+    timerId = setInterval(fetchLog, intervalMs);
+  </script>
+</body>
+</html>
+"""
+
+
+def write_log_viewer(reports_dir: Path) -> None:
+    """Write (or overwrite) log_viewer.html into reports_dir."""
+    out = reports_dir / "log_viewer.html"
+    out.write_text(LOG_VIEWER_HTML, encoding="utf-8")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build index.html for LKML reports.")
     parser.add_argument("--reports-dir", default="reports", help="Reports directory. Default: reports/")
@@ -666,6 +942,7 @@ def main():
     reports_dir = Path(args.reports_dir)
     logs_dir = Path(args.logs_dir) if args.logs_dir else reports_dir / "logs"
 
+    write_log_viewer(reports_dir)
     index_html = build_index(reports_dir, logs_dir)
     output = reports_dir / "index.html"
     output.write_text(index_html, encoding="utf-8")

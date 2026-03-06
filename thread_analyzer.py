@@ -872,8 +872,10 @@ def filter_subtree_messages(
     -----
     * The root message is always included.
     * Direct children of the root whose subject looks like an individual patch
-      submission (matches ``[PATCH N/M]`` with N > 0, no leading ``Re:``) are
-      pruned along with their entire sub-trees.
+      submission (matches ``[PATCH N/M]`` or ``[RFC vN N/M]`` with N > 0, no
+      leading ``Re:``) are excluded themselves (they carry heavy diffs already
+      covered by the cover letter) but their reply sub-trees ARE included, so
+      per-patch review comments and discussions are preserved.
     * All other descendants are included unconditionally.
 
     Works generically for any root message:
@@ -895,9 +897,11 @@ def filter_subtree_messages(
         if parent:
             children_of.setdefault(parent, []).append(mid)
 
-    # Detect individual patch submissions (e.g. "[PATCH 2/4] ...")
+    # Detect individual patch submissions (e.g. "[PATCH 2/4]", "[RFC v2 2/21]")
     _INDIVIDUAL_PATCH_RE = re.compile(
-        r"\[(?:RFC\s+)?PATCH[^\]]*\s+[1-9]\d*/\d+\]", re.IGNORECASE
+        r"\[(?:RFC\s+)?PATCH[^\]]*\s+[1-9]\d*/\d+\]"
+        r"|\[RFC[^\]]*\s+[1-9]\d*/\d+\]",
+        re.IGNORECASE
     )
 
     included: set = {root_id}
@@ -911,13 +915,16 @@ def filter_subtree_messages(
             if child_msg is None:
                 continue
             if is_root_level:
-                # Prune direct children that are individual patch submissions
-                # (they reply to the cover letter but are not review discussion).
+                # For direct children that are individual patch submissions,
+                # exclude the patch message itself (heavy diff, no new info
+                # beyond the cover letter) but still enqueue it so its review
+                # replies and sub-discussions are captured.
                 subject = child_msg.get("subject", "")
                 is_re = bool(re.match(r"^Re:\s*", subject, re.IGNORECASE))
                 is_patch_submit = bool(_INDIVIDUAL_PATCH_RE.search(subject))
                 if is_patch_submit and not is_re:
-                    continue  # skip this branch entirely
+                    queue.append(child_id)  # process children, but don't include the patch itself
+                    continue
             included.add(child_id)
             queue.append(child_id)
 

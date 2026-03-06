@@ -329,6 +329,48 @@ def _render_activity_item(
                 parts.append('<span class="version-arrow">\u2192</span>')
         parts.append('</span>')
 
+    # Individual patches sub-list (collapsible, cover letter representative only)
+    if item.series_items:
+        _SI_PATCH_NUM_RE = re.compile(
+            r"\[(?:RFC\s+)?PATCH[^\]]*\s+(\d+)/\d+\]|\[RFC[^\]]*\b(\d+)/\d+\]",
+            re.IGNORECASE,
+        )
+        total = item.series_patch_count or len(item.series_items)
+        parts.append('<details class="series-patches">')
+        parts.append(
+            f'<summary class="series-patches-toggle">'
+            f'Show {len(item.series_items)} individual patches</summary>'
+        )
+        parts.append('<ul class="series-patch-list">')
+        for si in item.series_items:
+            m = _SI_PATCH_NUM_RE.search(si.subject)
+            num = (m.group(1) or m.group(2)) if m else "?"
+            clean_title = re.sub(r"^\[.*?\]\s*", "", si.subject)
+            # Always derive the local review page slug directly from the message-id.
+            # review_links may not contain series items when the cover letter is
+            # "ongoing" (the individual patches may not have been in the lookback
+            # window), but the review page always exists on disk once it has been
+            # generated for any prior day.
+            si_slug = message_id_to_slug(si.message_id)
+            si_href = _esc(f"reviews/{si_slug}.html")
+            reviewer_badge = ""
+            if si.conversation and si.conversation.review_comments:
+                n = len(si.conversation.review_comments)
+                reviewer_badge = (
+                    f' <span class="si-reviewers">'
+                    f'{n} reviewer{"s" if n != 1 else ""}</span>'
+                )
+            parts.append(
+                f'<li class="series-patch-item">'
+                f'<span class="si-num">[{_esc(str(num))}/{total}]</span> '
+                f'<a href="{si_href}" target="_blank" class="si-link">'
+                f'{_esc(clean_title)}</a>'
+                f'{reviewer_badge}'
+                f'</li>'
+            )
+        parts.append('</ul>')
+        parts.append('</details>')
+
     review_link = _get_review_link(item, review_links, report_date)
 
     # Multi-LLM analyses (when --llm-all produces multiple results)
@@ -518,8 +560,7 @@ def _render_statistics(report: DailyReport) -> str:
     has_discussions = total_discussions > 0
     contrib_rows = []
     for dr in sorted(report.developer_reports,
-                     key=lambda r: -(len(r.patches_submitted) + len(r.patches_reviewed)
-                                     + len(r.patches_acked) + len(r.discussions_posted))):
+                     key=lambda r: r.developer.name.lower()):
         p = len(dr.patches_submitted)
         rv = len(dr.patches_reviewed)
         ack = len(dr.patches_acked)
@@ -718,12 +759,13 @@ def generate_html_report(
 
     developer_sections = "\n".join(
         _render_developer_section(dr, review_links=review_links, report_date=report_date)
-        for dr in daily_report.developer_reports
+        for dr in sorted(daily_report.developer_reports, key=lambda r: r.developer.name.lower())
     )
 
     stats_section = _render_statistics(daily_report)
 
     progress_html = ""
+    refresh_script = ""
     if progress_status:
         done  = progress_status.get("done", 0)
         total = progress_status.get("total", 0)
@@ -740,18 +782,68 @@ def generate_html_report(
             f'<span class="progress-spinner">&#x27F3;</span>'
             f'<span class="progress-count">{done} / {total} developers complete</span>'
             f'{cur_line}'
+            f'<span class="refresh-controls">'
+            f'Auto-refresh:'
+            f'<button class="refresh-btn" data-secs="60">1 min</button>'
+            f'<button class="refresh-btn" data-secs="300">5 min</button>'
+            f'<button class="refresh-btn" data-secs="600">10 min</button>'
+            f'<span class="refresh-countdown-wrap">in <span id="refresh-countdown">60s</span></span>'
+            f'</span>'
             f'{updated_line}'
             f'</div>'
         )
+        refresh_script = """
+<script>
+(function () {
+    var DEFAULT_SECS = 60;
+    var remaining, timer;
 
-    refresh_meta = '    <meta http-equiv="refresh" content="120">\n' if progress_status else ""
+    function stored() {
+        try { return parseInt(localStorage.getItem('lkml_refresh_secs')) || DEFAULT_SECS; }
+        catch (e) { return DEFAULT_SECS; }
+    }
+    function store(s) {
+        try { localStorage.setItem('lkml_refresh_secs', s); } catch (e) {}
+    }
+    function tick() {
+        remaining--;
+        update();
+        if (remaining <= 0) { clearInterval(timer); location.reload(); }
+    }
+    function start(secs) {
+        clearInterval(timer);
+        remaining = secs;
+        update();
+        timer = setInterval(tick, 1000);
+    }
+    function update() {
+        var el = document.getElementById('refresh-countdown');
+        if (el) el.textContent = remaining + 's';
+    }
+    function choose(secs) {
+        store(secs);
+        document.querySelectorAll('.refresh-btn').forEach(function (b) {
+            b.classList.toggle('active', parseInt(b.dataset.secs) === secs);
+        });
+        start(secs);
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        var secs = stored();
+        document.querySelectorAll('.refresh-btn').forEach(function (b) {
+            b.addEventListener('click', function () { choose(parseInt(b.dataset.secs)); });
+            if (parseInt(b.dataset.secs) === secs) b.classList.add('active');
+        });
+        start(secs);
+    });
+})();
+</script>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-{refresh_meta}    <title>LKML Activity Report - {_esc(daily_report.date)}{' [' + _esc(llm_label) + ']' if llm_label else ''}</title>
+    <title>LKML Activity Report - {_esc(daily_report.date)}{' [' + _esc(llm_label) + ']' if llm_label else ''}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -977,6 +1069,47 @@ def generate_html_report(
             font-size: 0.75em;
             color: #aaa;
             line-height: 1;
+        }}
+        .series-patches {{
+            margin-top: 8px;
+            margin-left: 4px;
+        }}
+        .series-patches-toggle {{
+            cursor: pointer;
+            font-size: 0.82em;
+            color: #555;
+            user-select: none;
+            list-style: none;
+        }}
+        .series-patches-toggle::-webkit-details-marker {{ display: none; }}
+        .series-patches-toggle::before {{ content: "\\25B6\\00A0"; font-size: 0.75em; }}
+        details[open] .series-patches-toggle::before {{ content: "\\25BC\\00A0"; }}
+        .series-patch-list {{
+            list-style: none;
+            margin: 6px 0 0 16px;
+            padding: 0 0 0 10px;
+            border-left: 2px solid #e0e0e0;
+        }}
+        .series-patch-item {{
+            padding: 3px 0;
+            font-size: 0.85em;
+            line-height: 1.4;
+        }}
+        .si-num {{
+            font-family: monospace;
+            color: #888;
+            font-size: 0.9em;
+        }}
+        .si-link {{ color: #0366d6; text-decoration: none; }}
+        .si-link:hover {{ text-decoration: underline; }}
+        .si-reviewers {{
+            display: inline-block;
+            font-size: 0.8em;
+            background: #e8f4fd;
+            color: #0366d6;
+            border-radius: 8px;
+            padding: 0 6px;
+            margin-left: 4px;
         }}
         .conversation-summary {{
             margin-top: 6px;
@@ -1329,10 +1462,35 @@ def generate_html_report(
             font-style: italic;
         }}
         .progress-updated {{
-            margin-left: auto;
             font-size: 0.85em;
             color: #6c5500;
             opacity: 0.75;
+        }}
+        .refresh-controls {{
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82em;
+            flex-shrink: 0;
+        }}
+        .refresh-btn {{
+            background: #fff8e1;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 1px 9px;
+            font-size: 0.9em;
+            cursor: pointer;
+            color: #856404;
+            transition: background 0.15s;
+        }}
+        .refresh-btn:hover {{ background: #ffe082; }}
+        .refresh-btn.active {{ background: #ffc107; color: #fff; font-weight: 700; }}
+        .refresh-countdown-wrap {{
+            color: #6c5500;
+            opacity: 0.75;
+            font-size: 0.9em;
+            min-width: 32px;
         }}
     </style>
 </head>
@@ -1355,5 +1513,6 @@ def generate_html_report(
         {'&bull; LLM: ' + _esc(llm_label) if llm_label else '&bull; Heuristic analysis'}
         {'&bull; <a href="logs/' + _esc(log_filename) + '">Log</a>' if log_filename else ''}
     </footer>
+{refresh_script}
 </body>
 </html>"""
