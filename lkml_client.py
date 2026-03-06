@@ -220,6 +220,11 @@ class LKMLClient:
                     "body": body,
                     "message_id": msg.get("message-id", "").strip("<>"),
                     "in_reply_to": msg.get("in-reply-to", "").strip("<>"),
+                    # Mailing list identification — empty string when absent.
+                    # normalize_list_id() in mailing_list_tracker converts these
+                    # to canonical "local@vger.kernel.org" form.
+                    "list_id": msg.get("list-id", "").strip(),
+                    "x_mailing_list": msg.get("x-mailing-list", "").strip(),
                 })
 
             return {"message_id": message_id, "messages": messages}
@@ -263,3 +268,27 @@ class LKMLClient:
             raise LKMLAPIError(f"Failed to fetch raw message {message_id}: {e}") from e
         except Exception as e:
             raise LKMLAPIError(f"Failed to parse raw message {message_id}: {e}") from e
+
+    def get_list_id_from_raw(self, message_id: str) -> tuple[str, str]:
+        """Fetch a raw message and return its List-Id and X-Mailing-List header values.
+
+        Used by scan_mailing_lists.py for retroactive backfill.  Only the headers
+        are needed so this is lightweight compared to get_thread().
+
+        Returns:
+            Tuple of (list_id_raw, x_mailing_list_raw).  Both are empty strings
+            when the respective header is absent or the fetch fails.
+        """
+        message_id = message_id.strip("<>")
+        url = f"{self.BASE_URL}/r/{message_id}/raw"
+        logger.debug("Fetching headers for list-id: %s", url)
+        try:
+            response = self._get_with_retry(url)
+            msg = email.message_from_string(response.text)
+            return (
+                msg.get("list-id", "").strip(),
+                msg.get("x-mailing-list", "").strip(),
+            )
+        except Exception as e:
+            logger.debug("get_list_id_from_raw failed for %s: %s", message_id, e)
+            return "", ""

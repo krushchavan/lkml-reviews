@@ -89,6 +89,7 @@ from models import (
     ActivityItem, ActivityType, ConversationSummary, DailyReport,
     Developer, DeveloperReport, LLMAnalysis, ReviewComment, Sentiment,
 )
+import mailing_list_tracker as mlt
 from report_generator import extract_reviews_data, generate_html_report, message_id_to_slug
 from thread_analyzer import analyze_thread, filter_subtree_messages
 
@@ -571,6 +572,18 @@ def process_developer(
                     thread_messages = []
                     thread_cache[msg_id] = thread_messages
 
+            # Capture the mailing list from the first thread message that carries a
+            # List-Id header.  Done before filter_subtree_messages so the root
+            # message (most likely to have the header) is always in scope.
+            if not item.list_id and thread_messages:
+                for _tmsg in thread_messages:
+                    _raw_lid = _tmsg.get("list_id", "") or _tmsg.get("x_mailing_list", "")
+                    if _raw_lid:
+                        _normalized = mlt.normalize_list_id(_raw_lid)
+                        if _normalized:
+                            item.list_id = _normalized
+                        break
+
             # Narrow the message list to the sub-thread rooted at this item's
             # message_id.  For a cover letter this strips out the individual
             # patch submissions ([PATCH 1/N] …) and their own review chains so
@@ -665,6 +678,7 @@ def _serialize_daily_report(
             "patch_summary": conv.patch_summary if conv else "",
             "analysis_source": conv.analysis_source if conv else "heuristic",
             "review_comments": rc_list,
+            "list_id": item.list_id,
         }
 
     dev_reports = []
@@ -737,6 +751,7 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
             is_ongoing=d.get("is_ongoing", False),
             submitted_date=d.get("submitted_date"),
             conversation=conv,
+            list_id=d.get("list_id", ""),
         )
         # Recursively deserialize individual patches in a series.
         item.series_items = [_load_item(si) for si in d.get("series_items", [])]
@@ -1171,6 +1186,35 @@ def generate_single_report(
             encoding="utf-8",
         )
         logger.debug("Saved daily summary: %s", daily_json_path)
+
+        # --- Update mailing list tracker ---
+        # Collect list_ids observed during this run and persist to data/mailing_lists.json.
+        # Wrapped in try/except so tracker failures never abort the main report pipeline.
+        try:
+            ml_state = mlt.load_state()
+            ml_new = 0
+            ml_total = 0
+            for _dr in daily_report.developer_reports:
+                for _item in (
+                    _dr.patches_submitted + _dr.patches_reviewed
+                    + _dr.patches_acked + _dr.discussions_posted
+                ):
+                    if _item.list_id:
+                        _is_new = mlt.record_contribution(
+                            ml_state, _item.list_id, date_display,
+                        )
+                        if _is_new:
+                            ml_new += 1
+                        ml_total += 1
+            if ml_total:
+                _pruned = mlt.prune_stale(ml_state)
+                mlt.save_state(ml_state)
+                logger.info(
+                    "Mailing list tracker: %d observations, %d new list(s), %d pruned",
+                    ml_total, ml_new, len(_pruned),
+                )
+        except Exception as _mlt_exc:
+            logger.warning("Mailing list tracker update failed (non-fatal): %s", _mlt_exc)
 
         # Generate HTML report with review links and log filename
         html_content = generate_html_report(
