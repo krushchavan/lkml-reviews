@@ -356,16 +356,33 @@ def build_review_html(data: dict) -> str:
     else:
         patch_summary_html = ""
 
-    # Date list for the page subtitle (newest first, comma-separated)
-    sorted_dates = sorted(dates.keys(), reverse=True)
+    # Date meta: submitted (oldest date) and last comment (from review message_dates)
+    sorted_dates = sorted(dates.keys(), reverse=True)   # newest first for nav
     date_range = ""
     if sorted_dates:
-        date_range = (
-            f'<div class="date-range">Active on: '
-            + " &bull; ".join(
-                f'<a href="#{_esc(d)}">{_esc(d)}</a>' for d in sorted_dates
+        submitted_date = sorted_dates[-1]   # earliest = when first seen/submitted
+        # Derive last comment date from actual review message_dates (most precise)
+        all_msg_dates = [
+            r.get("message_date", "")
+            for d in dates.values()
+            for r in d.get("reviews", [])
+            if r.get("message_date")
+        ]
+        last_comment_date = max(all_msg_dates) if all_msg_dates else sorted_dates[0]
+
+        meta_parts = [f'Submitted: <strong>{_esc(submitted_date)}</strong>']
+        if last_comment_date != submitted_date:
+            meta_parts.append(
+                f'Last comment: <strong>{_esc(last_comment_date)}</strong>'
             )
-            + "</div>"
+        nav_links = " &bull; ".join(
+            f'<a href="#{_esc(d)}">{_esc(d)}</a>' for d in sorted_dates
+        )
+        date_range = (
+            f'<div class="date-range">'
+            f'{"&nbsp;&nbsp;&middot;&nbsp;&nbsp;".join(meta_parts)}'
+            f'<div class="date-range-nav">Active on: {nav_links}</div>'
+            f'</div>'
         )
 
     return f"""<!DOCTYPE html>
@@ -397,12 +414,21 @@ def build_review_html(data: dict) -> str:
         .lore-link a:hover {{ text-decoration: underline; }}
 
         .date-range {{
-            font-size: 0.8em;
-            color: #888;
+            font-size: 0.82em;
+            color: #555;
             margin-bottom: 16px;
+            line-height: 1.9;
         }}
+        .date-range strong {{ color: #222; font-weight: 600; }}
         .date-range a {{ color: #0366d6; text-decoration: none; }}
         .date-range a:hover {{ text-decoration: underline; }}
+        .date-range-nav {{
+            font-size: 0.92em;
+            color: #aaa;
+            margin-top: 1px;
+        }}
+        .date-range-nav a {{ color: #aaa; }}
+        .date-range-nav a:hover {{ color: #0366d6; text-decoration: underline; }}
 
         /* thread-node scroll margin so the card isn't clipped at the top */
         .thread-node {{ scroll-margin-top: 8px; }}

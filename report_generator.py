@@ -286,6 +286,14 @@ def _get_review_link(
     return None
 
 
+def _last_comment_date(item: ActivityItem) -> str:
+    """Return the most recent reviewer message_date across all review comments, or ''."""
+    if not item.conversation:
+        return ""
+    dates = [rc.message_date for rc in item.conversation.review_comments if rc.message_date]
+    return max(dates) if dates else ""
+
+
 def _render_activity_item(
     item: ActivityItem, section_type: str,
     review_links: Optional[dict[str, str]] = None, report_date: str = ""
@@ -294,12 +302,16 @@ def _render_activity_item(
     css_class = "activity-item ongoing" if item.is_ongoing else "activity-item"
     parts.append(f'<div class="{css_class}">')
 
-    # Ongoing badge and submitted date
-    if item.is_ongoing and item.submitted_date:
+    # Ongoing badge
+    if item.is_ongoing:
         parts.append(f'<span class="ongoing-badge">Ongoing</span>')
+    # Submitted date (shown for all patches that have it, not just ongoing)
+    if item.submitted_date:
         parts.append(f'<span class="submitted-date">Submitted {_esc(item.submitted_date)}</span>')
-    elif item.is_ongoing:
-        parts.append(f'<span class="ongoing-badge">Ongoing</span>')
+    # Last comment date
+    last_comment = _last_comment_date(item)
+    if last_comment:
+        parts.append(f'<span class="last-comment-date">Last comment {_esc(last_comment)}</span>')
 
     # Title with link
     escaped_subject = _esc(item.subject)
@@ -354,18 +366,25 @@ def _render_activity_item(
             si_slug = message_id_to_slug(si.message_id)
             si_href = _esc(f"reviews/{si_slug}.html")
             reviewer_badge = ""
+            si_dates_html = ""
+            if si.submitted_date:
+                si_dates_html += f'<span class="si-date">Submitted {_esc(si.submitted_date)}</span>'
             if si.conversation and si.conversation.review_comments:
                 n = len(si.conversation.review_comments)
                 reviewer_badge = (
                     f' <span class="si-reviewers">'
                     f'{n} reviewer{"s" if n != 1 else ""}</span>'
                 )
+                rc_dates = [rc.message_date for rc in si.conversation.review_comments if rc.message_date]
+                if rc_dates:
+                    si_dates_html += f'<span class="si-date">Last comment {_esc(max(rc_dates))}</span>'
             parts.append(
                 f'<li class="series-patch-item">'
                 f'<span class="si-num">[{_esc(str(num))}/{total}]</span> '
                 f'<a href="{si_href}" target="_blank" class="si-link">'
                 f'{_esc(clean_title)}</a>'
                 f'{reviewer_badge}'
+                f'{(" " + si_dates_html) if si_dates_html else ""}'
                 f'</li>'
             )
         parts.append('</ul>')
@@ -1329,8 +1348,30 @@ def generate_html_report(
         .submitted-date {{
             font-size: 0.72em;
             color: #999;
+            margin-right: 6px;
+            vertical-align: middle;
+        }}
+        .last-comment-date {{
+            font-size: 0.72em;
+            color: #999;
             margin-right: 8px;
             vertical-align: middle;
+        }}
+        .last-comment-date::before {{
+            content: "·";
+            margin-right: 6px;
+            color: #ccc;
+        }}
+        .si-date {{
+            font-size: 0.68em;
+            color: #aaa;
+            margin-left: 6px;
+            vertical-align: middle;
+        }}
+        .si-date + .si-date::before {{
+            content: "·";
+            margin-right: 5px;
+            color: #ccc;
         }}
         .no-activity {{
             padding: 10px 20px;
