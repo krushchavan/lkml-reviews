@@ -109,6 +109,9 @@ class ActivityItem:
     submitted_date: Optional[str] = None  # Original submission date (YYYY-MM-DD)
     # Multiple LLM analyses with attribution (populated when --llm-all is used)
     llm_analyses: list[LLMAnalysis] = field(default_factory=list)
+    # Normalized vger mailing list address observed in this thread's List-Id header.
+    # e.g. "linux-mm@vger.kernel.org".  Empty string if not yet determined.
+    list_id: str = ""
 
 
 @dataclass
