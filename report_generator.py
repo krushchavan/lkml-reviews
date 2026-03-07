@@ -89,6 +89,8 @@ def _render_review_comment(rc: ReviewComment) -> str:
     # Author line with sentiment badge and tags
     parts.append('<div class="review-comment-header">')
     parts.append(f'<span class="review-author">{_esc(rc.author)}</span>')
+    if rc.is_maintainer:
+        parts.append('<span class="maintainer-badge">&#9733; Maintainer</span>')
 
     # Reply-to context
     if rc.reply_to:
@@ -145,16 +147,21 @@ def _render_compact_reviews(conv: ConversationSummary, review_link: str) -> str:
 
     # Build reviewer list, deduplicating by author and merging annotations
     author_annotations: dict[str, list[str]] = {}
+    author_is_maintainer: dict[str, bool] = {}
     for rc in conv.review_comments:
         entry = author_annotations.setdefault(rc.author, [])
         if rc.tags_given:
             entry.extend(rc.tags_given)
         if rc.has_inline_review:
             entry.append("Inline Review")
+        if rc.is_maintainer:
+            author_is_maintainer[rc.author] = True
 
     reviewer_descs = []
     for author, annotations in author_annotations.items():
         desc = _esc(author)
+        if author_is_maintainer.get(author):
+            desc += ' <span class="maintainer-badge-inline">&#9733;</span>'
         # Deduplicate annotations (e.g. "Reviewed-by" from two segments)
         seen: set[str] = set()
         unique_ann = [a for a in annotations if not (a in seen or seen.add(a))]
@@ -233,6 +240,18 @@ def _render_conversation_body(
             f'<div class="progress-detail">'
             f'<span class="progress-icon">&#9654;</span> '
             f'{_esc(conv.progress_detail)}'
+            f'</div>'
+        )
+
+    # Maintainer review note (shown whenever ≥1 maintainer commented)
+    maintainer_names = [rc.author for rc in conv.review_comments if rc.is_maintainer]
+    if maintainer_names:
+        seen: set[str] = set()
+        unique_names = [n for n in maintainer_names if not (n in seen or seen.add(n))]
+        names_str = ", ".join(_esc(n) for n in unique_names)
+        parts.append(
+            f'<div class="maintainer-review-note">'
+            f'&#9733; Maintainer review: {names_str}'
             f'</div>'
         )
 
@@ -1240,6 +1259,31 @@ def generate_html_report(
             font-weight: 500;
             background: #e3f2fd;
             color: #1565c0;
+        }}
+        .maintainer-badge {{
+            display: inline-block;
+            padding: 0 7px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            font-weight: 600;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+        }}
+        .maintainer-badge-inline {{
+            color: #b8860b;
+            font-size: 0.9em;
+        }}
+        .maintainer-review-note {{
+            display: inline-block;
+            margin: 4px 0 6px 0;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 600;
+            background: #fff8e1;
+            color: #795548;
+            border-left: 3px solid #ffc107;
         }}
         .review-tag-badge {{
             display: inline-block;

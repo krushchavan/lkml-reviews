@@ -806,9 +806,10 @@ def _build_conversation_summary(
     thread_messages: Optional[List[Dict]] = None,
 ) -> ConversationSummary:
     """Convert parsed LLM JSON into a ConversationSummary."""
-    # Build author→raw_body and author→earliest_date lookups from thread messages
+    # Build author→raw_body, author→earliest_date, and author→email lookups
     author_bodies: Dict[str, List[str]] = {}
     author_earliest_date: Dict[str, str] = {}
+    author_email: Dict[str, str] = {}
     if thread_messages:
         from email.utils import parsedate
         import time as _time
@@ -829,6 +830,8 @@ def _build_conversation_summary(
                             author_earliest_date[key] = ymd
                 except Exception:
                     pass
+            if key not in author_email:
+                author_email[key] = _extract_email(from_field)
 
     review_comments = []
     for rc_data in parsed.get("review_comments", []):
@@ -851,6 +854,8 @@ def _build_conversation_summary(
             raw_body=raw_body,
             reply_to=rc_data.get("reply_to", ""),
             message_date=rc_data.get("message_date", "") or author_earliest_date.get(author.lower(), ""),
+            message_id=rc_data.get("message_id", ""),
+            email=rc_data.get("email", "") or author_email.get(author.lower(), ""),
         ))
 
     overall_sentiment = _map_sentiment(
@@ -1910,6 +1915,7 @@ def _analyze_per_reviewer(
                     "message_date": reviewer_earliest_date,
                     "message_id": base_msg_id,
                     "_base_msg_id": base_msg_id,
+                    "email": email,
                 })
             continue
 
@@ -1923,6 +1929,7 @@ def _analyze_per_reviewer(
             rv_tagged = dict(cached_rv)
             rv_tagged["_base_msg_id"] = base_msg_id
             rv_tagged["message_id"] = base_msg_id
+            rv_tagged["email"] = email
             reviewer_results.append(rv_tagged)
             logger.debug("Per-reviewer cache hit for %s: %s", reviewer_name, activity_item.message_id)
             continue
@@ -1970,6 +1977,7 @@ def _analyze_per_reviewer(
                 parsed["message_date"] = reviewer_earliest_date
                 parsed["message_id"] = base_msg_id
                 parsed["_base_msg_id"] = base_msg_id
+                parsed["email"] = email
                 reviewer_results.append(parsed)
                 if cache:
                     cache.put(rv_cache_key, parsed, msg_date)
@@ -1989,6 +1997,7 @@ def _analyze_per_reviewer(
                     heuristic_rc["message_date"] = reviewer_earliest_date
                     heuristic_rc["message_id"] = base_msg_id
                     heuristic_rc["_base_msg_id"] = base_msg_id
+                    heuristic_rc["email"] = email
                     reviewer_results.append(heuristic_rc)
 
         except Exception as e:
@@ -2003,6 +2012,7 @@ def _analyze_per_reviewer(
                 heuristic_rc["message_date"] = reviewer_earliest_date
                 heuristic_rc["message_id"] = base_msg_id
                 heuristic_rc["_base_msg_id"] = base_msg_id
+                heuristic_rc["email"] = email
                 reviewer_results.append(heuristic_rc)
 
     # Merge per-segment results back into one entry per original message.
@@ -2033,6 +2043,7 @@ def _analyze_per_reviewer(
             reply_to=rc_data.get("reply_to", ""),
             message_date=rc_data.get("message_date", ""),
             message_id=rc_data.get("message_id", ""),
+            email=rc_data.get("email", ""),
         ))
 
     logger.info(

@@ -846,6 +846,8 @@ def _extract_review_comments(
             analysis_source="heuristic",
             raw_body=body,
             message_date=ymd,
+            message_id=msg.get("message_id", "").strip("<>"),
+            email=msg_email,
         ))
 
     # Sort by date ascending.  Within the same date, preserve the original

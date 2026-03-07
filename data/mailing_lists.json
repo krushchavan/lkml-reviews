@@ -2,6 +2,13 @@
   "schema_version": 1,
   "last_updated": "2026-03-06T19:55:49Z",
   "lists": {
+    "linux-mm@kvack.org": {
+      "address": "linux-mm@kvack.org",
+      "display_name": "Linux-MM",
+      "first_seen": "2026-03-06",
+      "last_seen": "2026-03-06",
+      "contribution_count": 0
+    },
     "linux-nfs@vger.kernel.org": {
       "address": "linux-nfs@vger.kernel.org",
       "display_name": "",
