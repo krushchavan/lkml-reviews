@@ -1,0 +1,5896 @@
+{
+  "netdev@vger.kernel.org": [
+    {
+      "subsystem": "3C59X NETWORK DRIVER",
+      "maintainers": [
+        "Steffen Klassert <klassert@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "3CR990 NETWORK DRIVER",
+      "maintainers": [
+        "David Dillow <dave@thedillows.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "8169 10/100/1000 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Heiner Kallweit <hkallweit1@gmail.com>",
+        "nic_swsd@realtek.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "8390 NETWORK DRIVERS [WD80x3/SMC-ELITE, SMC-ULTRA, NE2000, 3C503, etc.]",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan / Obsolete"
+    },
+    {
+      "subsystem": "AEONSEMI PHY DRIVER",
+      "maintainers": [
+        "Christian Marangi <ansuelsmth@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AIROHA ETHERNET DRIVER",
+      "maintainers": [
+        "Lorenzo Bianconi <lorenzo@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ALTERA TRIPLE SPEED ETHERNET DRIVER",
+      "maintainers": [
+        "Boon Khai Ng <boon.khai.ng@altera.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AMAZON ETHERNET DRIVERS",
+      "maintainers": [
+        "Arthur Kiyanovski <akiyano@amazon.com>",
+        "David Arinzon <darinzon@amazon.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AMD PDS CORE DRIVER",
+      "maintainers": [
+        "Brett Creeley <brett.creeley@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AMD XGBE DRIVER",
+      "maintainers": [
+        "Raju Rangoju <Raju.Rangoju@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AMT (Automatic Multicast Tunneling)",
+      "maintainers": [
+        "Taehee Yoo <ap420073@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ANALOG DEVICES INC ADIN DRIVER",
+      "maintainers": [
+        "Michael Hennerich <michael.hennerich@analog.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "APPLETALK NETWORK LAYER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Odd fixes"
+    },
+    {
+      "subsystem": "APPLIED MICRO QT2025 PHY DRIVER",
+      "maintainers": [
+        "FUJITA Tomonori <fujita.tomonori@gmail.com>"
+      ],
+      "reviewers": [
+        "Trevor Gross <tmgross@umich.edu>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AQUANTIA ETHERNET DRIVER (atlantic)",
+      "maintainers": [
+        "Igor Russkikh <irusskikh@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AQUANTIA ETHERNET DRIVER PTP SUBSYSTEM",
+      "maintainers": [
+        "Egor Pomozov <epomozov@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ARCNET NETWORK LAYER",
+      "maintainers": [
+        "Michael Grzeschik <m.grzeschik@pengutronix.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ARROW SPEEDCHIPS XRS7000 SERIES ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "George McCollister <george.mccollister@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ASIX PHY DRIVER [RUST]",
+      "maintainers": [
+        "FUJITA Tomonori <fujita.tomonori@gmail.com>"
+      ],
+      "reviewers": [
+        "Trevor Gross <tmgross@umich.edu>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ATLX ETHERNET DRIVERS",
+      "maintainers": [
+        "Chris Snook <chris.snook@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ATM",
+      "maintainers": [
+        "Chas Williams <3chas3@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BECKHOFF CX5020 ETHERCAT MASTER DRIVER",
+      "maintainers": [
+        "Dariusz Marcinkiewicz <reksio@newterm.pl>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BONDING DRIVER",
+      "maintainers": [
+        "Jay Vosburgh <jv@jvosburgh.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [L7 FRAMEWORK] (sockmap)",
+      "maintainers": [
+        "John Fastabend <john.fastabend@gmail.com>",
+        "Jakub Sitnicki <jakub@cloudflare.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [NETKIT] (BPF-programmable network device)",
+      "maintainers": [
+        "Daniel Borkmann <daniel@iogearbox.net>",
+        "Nikolay Aleksandrov <razor@blackwall.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF [NETWORKING] (struct_ops, reuseport)",
+      "maintainers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [NETWORKING] (tcx & tc BPF, sock_addr)",
+      "maintainers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>",
+        "Daniel Borkmann <daniel@iogearbox.net>"
+      ],
+      "reviewers": [
+        "John Fastabend <john.fastabend@gmail.com>",
+        "Stanislav Fomichev <sdf@fomichev.me>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM ASP 2.0 ETHERNET DRIVER",
+      "maintainers": [
+        "Justin Chen <justin.chen@broadcom.com>",
+        "Florian Fainelli <florian.fainelli@broadcom.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BROADCOM B44 10/100 ETHERNET DRIVER",
+      "maintainers": [
+        "Michael Chan <michael.chan@broadcom.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM B53/SF2 ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "Florian Fainelli <florian.fainelli@broadcom.com>",
+        "Jonas Gorski <jonas.gorski@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BROADCOM BCM4908 ETHERNET DRIVER",
+      "maintainers": [
+        "Rafał Miłecki <rafal@milecki.pl>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM BNX2 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Rasesh Mody <rmody@marvell.com>",
+        "GR-Linux-NIC-Dev@marvell.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM BNX2X 10 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Sudarsana Kalluru <skalluru@marvell.com>",
+        "Manish Chopra <manishc@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM BNXT_EN 50 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Michael Chan <michael.chan@broadcom.com>",
+        "Pavan Chebbi <pavan.chebbi@broadcom.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM BNG_EN 800 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Vikas Gupta <vikas.gupta@broadcom.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM ETHERNET PHY DRIVERS",
+      "maintainers": [
+        "Florian Fainelli <florian.fainelli@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BROADCOM GENET ETHERNET DRIVER",
+      "maintainers": [
+        "Doug Berger <opendmb@gmail.com>",
+        "Florian Fainelli <florian.fainelli@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM IPROC GBIT ETHERNET DRIVER",
+      "maintainers": [
+        "Rafał Miłecki <rafal@milecki.pl>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM SYSTEMPORT ETHERNET DRIVER",
+      "maintainers": [
+        "Florian Fainelli <florian.fainelli@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM TG3 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Pavan Chebbi <pavan.chebbi@broadcom.com>",
+        "Michael Chan <mchan@broadcom.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROCADE BNA 10 GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Rasesh Mody <rmody@marvell.com>",
+        "Sudarsana Kalluru <skalluru@marvell.com>",
+        "GR-Linux-NIC-Dev@marvell.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CAIF NETWORK LAYER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "CAVIUM LIQUIDIO NETWORK DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "CBS/ETF/TAPRIO QDISCS",
+      "maintainers": [
+        "Vinicius Costa Gomes <vinicius.gomes@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CIRRUS LOGIC EP93XX ETHERNET DRIVER",
+      "maintainers": [
+        "Hartley Sweeten <hsweeten@visionengravers.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CXGB3 ETHERNET DRIVER (CXGB3)",
+      "maintainers": [
+        "Potnuri Bharat Teja <bharat@chelsio.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CXGB4 ETHERNET DRIVER (CXGB4)",
+      "maintainers": [
+        "Potnuri Bharat Teja <bharat@chelsio.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CXGB4 INLINE CRYPTO DRIVER",
+      "maintainers": [
+        "Ayush Sawal <ayush.sawal@chelsio.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CXGB4VF ETHERNET DRIVER (CXGB4VF)",
+      "maintainers": [
+        "Potnuri Bharat Teja <bharat@chelsio.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DAVICOM FAST ETHERNET (DMFE) NETWORK DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "DEVLINK",
+      "maintainers": [
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "DIBS (DIRECT INTERNAL BUFFER SHARING)",
+      "maintainers": [
+        "Alexandra Winter <wintera@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "DPAA2 ETHERNET DRIVER",
+      "maintainers": [
+        "Ioana Ciornei <ioana.ciornei@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DPAA2 ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "Ioana Ciornei <ioana.ciornei@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DPLL SUBSYSTEM",
+      "maintainers": [
+        "Vadim Fedorenko <vadim.fedorenko@linux.dev>",
+        "Arkadiusz Kubalewski <arkadiusz.kubalewski@intel.com>",
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "EHEA (IBM pSeries eHEA 10Gb ethernet adapter) DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "EMULEX 10Gbps NIC BE2, BE3-R, Lancer, Skyhawk-R DRIVER (be2net)",
+      "maintainers": [
+        "Ajit Khaparde <ajit.khaparde@broadcom.com>",
+        "Sriharsha Basavapatna <sriharsha.basavapatna@broadcom.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ETHERNET BRIDGE",
+      "maintainers": [
+        "Nikolay Aleksandrov <razor@blackwall.org>",
+        "Ido Schimmel <idosch@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ETHERNET PHY LIBRARY",
+      "maintainers": [
+        "Andrew Lunn <andrew@lunn.ch>",
+        "Heiner Kallweit <hkallweit1@gmail.com>"
+      ],
+      "reviewers": [
+        "Russell King <linux@armlinux.org.uk>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ETHERNET PHY LIBRARY [RUST]",
+      "maintainers": [
+        "FUJITA Tomonori <fujita.tomonori@gmail.com>"
+      ],
+      "reviewers": [
+        "Trevor Gross <tmgross@umich.edu>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FAILOVER MODULE",
+      "maintainers": [
+        "Sridhar Samudrala <sridhar.samudrala@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "FORCEDETH GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Rain River <rain.1986.08.12@gmail.com>",
+        "Zhu Yanjun <zyjzyj2000@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE ENETC ETHERNET DRIVERS",
+      "maintainers": [
+        "Claudiu Manoil <claudiu.manoil@nxp.com>",
+        "Vladimir Oltean <vladimir.oltean@nxp.com>",
+        "Wei Fang <wei.fang@nxp.com>",
+        "Clark Wang <xiaoning.wang@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE eTSEC ETHERNET DRIVER (GIANFAR)",
+      "maintainers": [
+        "Claudiu Manoil <claudiu.manoil@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE IMX / MXC FEC DRIVER",
+      "maintainers": [
+        "Wei Fang <wei.fang@nxp.com>"
+      ],
+      "reviewers": [
+        "Frank Li <frank.li@nxp.com>",
+        "Shenwei Wang <shenwei.wang@nxp.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE QORIQ DPAA ETHERNET DRIVER",
+      "maintainers": [
+        "Madalin Bucur <madalin.bucur@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE QORIQ DPAA FMAN DRIVER",
+      "maintainers": [
+        "Madalin Bucur <madalin.bucur@nxp.com>"
+      ],
+      "reviewers": [
+        "Sean Anderson <sean.anderson@seco.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE QORIQ PTP CLOCK DRIVER",
+      "maintainers": [
+        "Yangbo Lu <yangbo.lu@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE QUICC ENGINE QMC HDLC DRIVER",
+      "maintainers": [
+        "Herve Codina <herve.codina@bootlin.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE QUICC ENGINE UCC ETHERNET DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "FREESCALE QUICC ENGINE UCC HDLC DRIVER",
+      "maintainers": [
+        "Zhao Qiang <qiang.zhao@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREESCALE SOC FS_ENET DRIVER",
+      "maintainers": [
+        "Pantelis Antoniou <pantelis.antoniou@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FUNGIBLE ETHERNET DRIVERS",
+      "maintainers": [
+        "Dimitris Michailidis <dmichail@fungible.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "GOOGLE ETHERNET DRIVERS",
+      "maintainers": [
+        "Joshua Washington <joshwash@google.com>",
+        "Harshitha Ramamurthy <hramamurthy@google.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "GRETH 10/100/1G Ethernet MAC device driver",
+      "maintainers": [
+        "Andreas Larsson <andreas@gaisler.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HANDSHAKE UPCALL FOR TRANSPORT LAYER SECURITY",
+      "maintainers": [
+        "Chuck Lever <chuck.lever@oracle.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HIRSCHMANN HELLCREEK ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "Kurt Kanzenbach <kurt@linutronix.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HISILICON NETWORK SUBSYSTEM 3 DRIVER (HNS3)",
+      "maintainers": [
+        "Jian Shen <shenjian15@huawei.com>",
+        "Salil Mehta <salil.mehta@huawei.com>",
+        "Jijie Shao <shaojijie@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HISILICON NETWORK HIBMCGE DRIVER",
+      "maintainers": [
+        "Jijie Shao <shaojijie@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HISILICON NETWORK SUBSYSTEM DRIVER",
+      "maintainers": [
+        "Jian Shen <shenjian15@huawei.com>",
+        "Salil Mehta <salil.mehta@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HSR NETWORK PROTOCOL",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "HUAWEI ETHERNET DRIVER",
+      "maintainers": [
+        "Cai Huoqing <cai.huoqing@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HUAWEI 3RD GEN ETHERNET DRIVER",
+      "maintainers": [
+        "Fan Gong <gongfan1@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "IBM Power SRIOV Virtual NIC Device Driver",
+      "maintainers": [
+        "Haren Myneni <haren@linux.ibm.com>",
+        "Rick Lindsley <ricklind@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Nick Child <nnac123@linux.ibm.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "IBM Power Virtual Ethernet Device Driver",
+      "maintainers": [
+        "Nick Child <nnac123@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "INTEL PTP DFL ToD DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "INTEL WWAN IOSM DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "IO_URING ZCRX",
+      "maintainers": [
+        "Pavel Begunkov <asml.silence@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "IPVS",
+      "maintainers": [
+        "Simon Horman <horms@verge.net.au>",
+        "Julian Anastasov <ja@ssi.bg>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ISDN/CMTP OVER BLUETOOTH",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "ISDN/mISDN SUBSYSTEM",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "JME NETWORK DRIVER",
+      "maintainers": [
+        "Guo-Fu Tseng <cooldavid@cooldavid.org>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "L3MDEV",
+      "maintainers": [
+        "David Ahern <dsahern@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LANTIQ / MAXLINEAR / INTEL Ethernet DSA drivers",
+      "maintainers": [
+        "Hauke Mehrtens <hauke@hauke-m.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LIBETH COMMON ETHERNET LIBRARY",
+      "maintainers": [
+        "Alexander Lobakin <aleksander.lobakin@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LIBIE COMMON INTEL ETHERNET LIBRARY",
+      "maintainers": [
+        "Alexander Lobakin <aleksander.lobakin@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LLC (802.2)",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Odd fixes"
+    },
+    {
+      "subsystem": "LYNX 28G SERDES PHY DRIVER",
+      "maintainers": [
+        "Ioana Ciornei <ioana.ciornei@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LYNX PCS MODULE",
+      "maintainers": [
+        "Ioana Ciornei <ioana.ciornei@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MANAGEMENT COMPONENT TRANSPORT PROTOCOL (MCTP)",
+      "maintainers": [
+        "Jeremy Kerr <jk@codeconstruct.com.au>",
+        "Matt Johnston <matt@codeconstruct.com.au>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL 88E6XXX ETHERNET SWITCH FABRIC DRIVER",
+      "maintainers": [
+        "Andrew Lunn <andrew@lunn.ch>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL GIGABIT ETHERNET DRIVERS (skge/sky2)",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "MARVELL MV643XX ETHERNET DRIVER",
+      "maintainers": [
+        "Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL MV88X3310 PHY DRIVER",
+      "maintainers": [
+        "Russell King <linux@armlinux.org.uk>",
+        "Marek Behún <kabel@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL MVNETA ETHERNET DRIVER",
+      "maintainers": [
+        "Marcin Wojtas <marcin.s.wojtas@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL MVPP2 ETHERNET DRIVER",
+      "maintainers": [
+        "Marcin Wojtas <marcin.s.wojtas@gmail.com>",
+        "Russell King <linux@armlinux.org.uk>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL OCTEON ENDPOINT DRIVER",
+      "maintainers": [
+        "Veerasenareddy Burru <vburru@marvell.com>",
+        "Sathesh Edara <sedara@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL OCTEON ENDPOINT VF DRIVER",
+      "maintainers": [
+        "Veerasenareddy Burru <vburru@marvell.com>",
+        "Sathesh Edara <sedara@marvell.com>",
+        "Shinas Rasheed <srasheed@marvell.com>",
+        "Satananda Burla <sburla@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL OCTEONTX2 PHYSICAL FUNCTION DRIVER",
+      "maintainers": [
+        "Sunil Goutham <sgoutham@marvell.com>",
+        "Geetha sowjanya <gakula@marvell.com>",
+        "Subbaraya Sundeep <sbhatta@marvell.com>",
+        "hariprasad <hkelam@marvell.com>",
+        "Bharat Bhushan <bbhushan2@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL OCTEONTX2 RVU ADMIN FUNCTION DRIVER",
+      "maintainers": [
+        "Sunil Goutham <sgoutham@marvell.com>",
+        "Linu Cherian <lcherian@marvell.com>",
+        "Geetha sowjanya <gakula@marvell.com>",
+        "hariprasad <hkelam@marvell.com>",
+        "Subbaraya Sundeep <sbhatta@marvell.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MARVELL USB MDIO CONTROLLER DRIVER",
+      "maintainers": [
+        "Tobias Waldekranz <tobias@waldekranz.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXLINEAR ETHERNET PHY DRIVER",
+      "maintainers": [
+        "Xu Liang <lxu@maxlinear.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MAXLINEAR MXL862XX SWITCH DRIVER",
+      "maintainers": [
+        "Daniel Golle <daniel@makrotopia.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MDIO REGMAP DRIVER",
+      "maintainers": [
+        "Maxime Chevallier <maxime.chevallier@bootlin.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEDIATEK ETHERNET DRIVER",
+      "maintainers": [
+        "Felix Fietkau <nbd@nbd.name>",
+        "Lorenzo Bianconi <lorenzo@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEDIATEK ETHERNET PCS DRIVER",
+      "maintainers": [
+        "Alexander Couzens <lynxis@fe80.eu>",
+        "Daniel Golle <daniel@makrotopia.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEDIATEK ETHERNET PHY DRIVERS",
+      "maintainers": [
+        "Daniel Golle <daniel@makrotopia.org>",
+        "Qingfang Deng <dqfext@gmail.com>",
+        "SkyLake Huang <SkyLake.Huang@mediatek.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEDIATEK SWITCH DRIVER",
+      "maintainers": [
+        "Chester A. Unal <chester.a.unal@arinc9.com>",
+        "Daniel Golle <daniel@makrotopia.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEDIATEK T7XX 5G WWAN MODEM DRIVER",
+      "maintainers": [
+        "Chandrashekar Devegowda <chandrashekar.devegowda@intel.com>"
+      ],
+      "reviewers": [
+        "Chiranjeevi Rapolu <chiranjeevi.rapolu@linux.intel.com>",
+        "Liu Haijun <haijun.liu@mediatek.com>",
+        "Ricardo Martinez <ricardo.martinez@linux.intel.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MELLANOX ETHERNET DRIVER (mlx4_en)",
+      "maintainers": [
+        "Tariq Toukan <tariqt@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MELLANOX ETHERNET DRIVER (mlx5e)",
+      "maintainers": [
+        "Saeed Mahameed <saeedm@nvidia.com>",
+        "Tariq Toukan <tariqt@nvidia.com>",
+        "Mark Bloch <mbloch@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MELLANOX ETHERNET INNOVA DRIVERS",
+      "maintainers": [],
+      "reviewers": [
+        "Boris Pismenny <borisp@nvidia.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MELLANOX ETHERNET SWITCH DRIVERS",
+      "maintainers": [
+        "Ido Schimmel <idosch@nvidia.com>",
+        "Petr Machata <petrm@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MELLANOX FIRMWARE FLASH LIBRARY (mlxfw)",
+      "maintainers": [
+        "mlxsw@nvidia.com"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MELLANOX MLX4 core VPI driver",
+      "maintainers": [
+        "Tariq Toukan <tariqt@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MELLANOX MLX5 core VPI driver",
+      "maintainers": [
+        "Saeed Mahameed <saeedm@nvidia.com>",
+        "Leon Romanovsky <leonro@nvidia.com>",
+        "Tariq Toukan <tariqt@nvidia.com>",
+        "Mark Bloch <mbloch@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "Woojung Huh <woojung.huh@microchip.com>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP LAN743X ETHERNET DRIVER",
+      "maintainers": [
+        "Bryan Whitehead <bryan.whitehead@microchip.com>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP LAN8650/1 10BASE-T1S MACPHY ETHERNET DRIVER",
+      "maintainers": [
+        "Parthiban Veerasooran <parthiban.veerasooran@microchip.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP LAN87xx/LAN937x T1 PHY DRIVER",
+      "maintainers": [
+        "Arun Ramadoss <arun.ramadoss@microchip.com>"
+      ],
+      "reviewers": [
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP LAN966X ETHERNET DRIVER",
+      "maintainers": [
+        "Horatiu Vultur <horatiu.vultur@microchip.com>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP LAN969X ETHERNET DRIVER",
+      "maintainers": [
+        "Daniel Machon <daniel.machon@microchip.com>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP ZL3073X DRIVER",
+      "maintainers": [
+        "Ivan Vecera <ivecera@redhat.com>",
+        "Prathosh Satish <Prathosh.Satish@microchip.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MOTORCOMM DWMAC GLUE DRIVER",
+      "maintainers": [
+        "Yao Zi <me@ziyao.cc>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MOTORCOMM PHY DRIVER",
+      "maintainers": [
+        "Frank <Frank.Sae@motor-comm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MOTORCOMM YT921X ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "David Yang <mmyangfl@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MUCSE ETHERNET DRIVER",
+      "maintainers": [
+        "Yibo Dong <dong100@mucse.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MYRICOM MYRI-10G 10GbE DRIVER (MYRI10GE)",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "NETEM NETWORK EMULATOR",
+      "maintainers": [
+        "Stephen Hemminger <stephen@networkplumber.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORK DROP MONITOR",
+      "maintainers": [
+        "Neil Horman <nhorman@tuxdriver.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING DRIVERS",
+      "maintainers": [
+        "Andrew Lunn <andrew+netdev@lunn.ch>",
+        "\"David S. Miller\" <davem@davemloft.net>",
+        "Eric Dumazet <edumazet@google.com>",
+        "Jakub Kicinski <kuba@kernel.org>",
+        "Paolo Abeni <pabeni@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [GENERAL]",
+      "maintainers": [
+        "\"David S. Miller\" <davem@davemloft.net>",
+        "Eric Dumazet <edumazet@google.com>",
+        "Jakub Kicinski <kuba@kernel.org>",
+        "Paolo Abeni <pabeni@redhat.com>"
+      ],
+      "reviewers": [
+        "Simon Horman <horms@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [IPSEC]",
+      "maintainers": [
+        "Steffen Klassert <steffen.klassert@secunet.com>",
+        "Herbert Xu <herbert@gondor.apana.org.au>",
+        "\"David S. Miller\" <davem@davemloft.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [IPv4/IPv6]",
+      "maintainers": [
+        "\"David S. Miller\" <davem@davemloft.net>",
+        "David Ahern <dsahern@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [LABELED] (NetLabel, Labeled IPsec, SECMARK)",
+      "maintainers": [
+        "Paul Moore <paul@paul-moore.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "NETWORKING [MACSEC]",
+      "maintainers": [
+        "Sabrina Dubroca <sd@queasysnail.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [MPTCP]",
+      "maintainers": [
+        "Matthieu Baerts <matttbe@kernel.org>",
+        "Mat Martineau <martineau@kernel.org>"
+      ],
+      "reviewers": [
+        "Geliang Tang <geliang@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [SRv6]",
+      "maintainers": [
+        "Andrea Mayer <andrea.mayer@uniroma2.it>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [TCP]",
+      "maintainers": [
+        "Eric Dumazet <edumazet@google.com>",
+        "Neal Cardwell <ncardwell@google.com>"
+      ],
+      "reviewers": [
+        "Kuniyuki Iwashima <kuniyu@google.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETWORKING [TLS]",
+      "maintainers": [
+        "John Fastabend <john.fastabend@gmail.com>",
+        "Jakub Kicinski <kuba@kernel.org>",
+        "Sabrina Dubroca <sd@queasysnail.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NETXEN (1/10) GbE SUPPORT",
+      "maintainers": [
+        "Manish Chopra <manishc@marvell.com>",
+        "Rahul Verma <rahulv@marvell.com>",
+        "GR-Linux-NIC-Dev@marvell.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NET_FAILOVER MODULE",
+      "maintainers": [
+        "Sridhar Samudrala <sridhar.samudrala@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "NEXTHOP",
+      "maintainers": [
+        "David Ahern <dsahern@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NFC SUBSYSTEM",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "NFC VIRTUAL NCI DEVICE DRIVER",
+      "maintainers": [
+        "Bongsu Jeon <bongsu.jeon@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "NXP C45 TJA11XX PHY DRIVER",
+      "maintainers": [
+        "Andrei Botila <andrei.botila@oss.nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NXP NETC TIMER PTP CLOCK DRIVER",
+      "maintainers": [
+        "Wei Fang <wei.fang@nxp.com>",
+        "Clark Wang <xiaoning.wang@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "OBJAGG",
+      "maintainers": [
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "OCELOT ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "Vladimir Oltean <vladimir.oltean@nxp.com>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ONSEMI ETHERNET PHY DRIVERS",
+      "maintainers": [
+        "Piergiorgio Beruto <piergiorgio.beruto@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "OPEN ALLIANCE 10BASE-T1S MACPHY SERIAL INTERFACE FRAMEWORK",
+      "maintainers": [
+        "Parthiban Veerasooran <parthiban.veerasooran@microchip.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "OPENCOMPUTE PTP CLOCK DRIVER",
+      "maintainers": [
+        "Vadim Fedorenko <vadim.fedorenko@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "OPENVPN DATA CHANNEL OFFLOAD",
+      "maintainers": [
+        "Antonio Quartulli <antonio@openvpn.net>"
+      ],
+      "reviewers": [
+        "Sabrina Dubroca <sd@queasysnail.net>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "OPENVSWITCH",
+      "maintainers": [
+        "Aaron Conole <aconole@redhat.com>",
+        "Eelco Chaudron <echaudro@redhat.com>",
+        "Ilya Maximets <i.maximets@ovn.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PACKING",
+      "maintainers": [
+        "Vladimir Oltean <olteanv@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "PAGE POOL",
+      "maintainers": [
+        "Jesper Dangaard Brouer <hawk@kernel.org>",
+        "Ilias Apalodimas <ilias.apalodimas@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "PARMAN",
+      "maintainers": [
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "PCNET32 NETWORK DRIVER",
+      "maintainers": [
+        "Don Fry <pcnet32@frontier.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PENSANDO ETHERNET DRIVERS",
+      "maintainers": [
+        "Brett Creeley <brett.creeley@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PHY COMMON PROPERTIES",
+      "maintainers": [
+        "Vladimir Oltean <vladimir.oltean@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PLCA RECONCILIATION SUBLAYER (IEEE802.3 Clause 148)",
+      "maintainers": [
+        "Piergiorgio Beruto <piergiorgio.beruto@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PS3 NETWORK SUPPORT",
+      "maintainers": [
+        "Geoff Levand <geoff@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PSE NETWORK DRIVER",
+      "maintainers": [
+        "Oleksij Rempel <o.rempel@pengutronix.de>",
+        "Kory Maincent <kory.maincent@bootlin.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PTP HARDWARE CLOCK SUPPORT",
+      "maintainers": [
+        "Richard Cochran <richardcochran@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PTP MOCKUP CLOCK SUPPORT",
+      "maintainers": [
+        "Vladimir Oltean <vladimir.oltean@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PTP VIRTUAL CLOCK SUPPORT",
+      "maintainers": [
+        "Yangbo Lu <yangbo.lu@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PTP VMCLOCK SUPPORT",
+      "maintainers": [
+        "David Woodhouse <dwmw2@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QCOM IPA DRIVER",
+      "maintainers": [
+        "Alex Elder <elder@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QLOGIC QL4xxx ETHERNET DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "QLOGIC QLA3XXX NETWORK DRIVER",
+      "maintainers": [
+        "GR-Linux-NIC-Dev@marvell.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QLOGIC QLCNIC (1/10)Gb ETHERNET DRIVER",
+      "maintainers": [
+        "Shahed Shaikh <shshaikh@marvell.com>",
+        "Manish Chopra <manishc@marvell.com>",
+        "GR-Linux-NIC-Dev@marvell.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM ATHEROS QCA7K ETHERNET DRIVER",
+      "maintainers": [
+        "Stefan Wahren <wahrenst@gmx.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM BAM-DMUX WWAN NETWORK DRIVER",
+      "maintainers": [
+        "Stephan Gerhold <stephan@gerhold.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM EMAC GIGABIT ETHERNET DRIVER",
+      "maintainers": [
+        "Timur Tabi <timur@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM ETHQOS ETHERNET DRIVER",
+      "maintainers": [
+        "Mohd Ayaan Anwar <mohd.anwar@oss.qualcomm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM PPE DRIVER",
+      "maintainers": [
+        "Luo Jie <quic_luoj@quicinc.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "QUALCOMM RMNET DRIVER",
+      "maintainers": [
+        "Subash Abhinov Kasiviswanathan <subash.a.kasiviswanathan@oss.qualcomm.com>",
+        "Sean Tranchetti <sean.tranchetti@oss.qualcomm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RDC R6040 FAST ETHERNET DRIVER",
+      "maintainers": [
+        "Florian Fainelli <f.fainelli@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RDS - RELIABLE DATAGRAM SOCKETS",
+      "maintainers": [
+        "Allison Henderson <allison.henderson@oracle.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "REMOTE PROCESSOR MESSAGING (RPMSG) WWAN CONTROL DRIVER",
+      "maintainers": [
+        "Stephan Gerhold <stephan@gerhold.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS ETHERNET AVB DRIVER",
+      "maintainers": [
+        "Niklas Söderlund <niklas.soderlund@ragnatech.se>"
+      ],
+      "reviewers": [
+        "Paul Barker <paul@pbarker.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS ETHERNET SWITCH DRIVER",
+      "maintainers": [],
+      "reviewers": [
+        "Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>"
+      ],
+      "status": ""
+    },
+    {
+      "subsystem": "RENESAS ETHERNET TSN DRIVER",
+      "maintainers": [
+        "Niklas Söderlund <niklas.soderlund@ragnatech.se>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS RZ/N1 A5PSW SWITCH DRIVER",
+      "maintainers": [
+        "Clément Léger <clement.leger@bootlin.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS RZ/V2H(P) DWMAC GBETH GLUE LAYER DRIVER",
+      "maintainers": [
+        "Lad Prabhakar <prabhakar.mahadev-lad.rj@bp.renesas.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS SUPERH ETHERNET DRIVER",
+      "maintainers": [
+        "Niklas Söderlund <niklas.soderlund@ragnatech.se>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ROCKER DRIVER",
+      "maintainers": [
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "RTASE ETHERNET DRIVER",
+      "maintainers": [
+        "Justin Lai <justinlai0215@realtek.com>",
+        "Larry Chiu <larry.chiu@realtek.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "S390 IUCV NETWORK LAYER",
+      "maintainers": [
+        "Alexandra Winter <wintera@linux.ibm.com>",
+        "Thorsten Winkler <twinkler@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 NETWORK DRIVERS",
+      "maintainers": [
+        "Alexandra Winter <wintera@linux.ibm.com>",
+        "Aswin Karuvally <aswin@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SAMSUNG SXGBE DRIVERS",
+      "maintainers": [
+        "Byungho An <bh74.an@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SFC NETWORK DRIVER",
+      "maintainers": [
+        "Edward Cree <ecree.xilinx@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SFF/SFP/SFP+ MODULE SUPPORT",
+      "maintainers": [
+        "Russell King <linux@armlinux.org.uk>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SIS 190 ETHERNET DRIVER",
+      "maintainers": [
+        "Francois Romieu <romieu@fr.zoreil.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SIS 900/7016 FAST ETHERNET DRIVER",
+      "maintainers": [
+        "Daniele Venzano <venza@brownhat.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SMSC911x ETHERNET DRIVER",
+      "maintainers": [
+        "Steve Glendinning <steve.glendinning@shawell.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SMSC9420 PCI ETHERNET DRIVER",
+      "maintainers": [
+        "Steve Glendinning <steve.glendinning@shawell.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SOCIONEXT (SNI) AVE NETWORK DRIVER",
+      "maintainers": [
+        "Kunihiko Hayashi <hayashi.kunihiko@socionext.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SOCIONEXT (SNI) NETSEC NETWORK DRIVER",
+      "maintainers": [
+        "Ilias Apalodimas <ilias.apalodimas@linaro.org>",
+        "Masahisa Kojima <kojima.masahisa@socionext.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SONIC NETWORK DRIVER",
+      "maintainers": [
+        "Thomas Bogendoerfer <tsbogend@alpha.franken.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "STMMAC ETHERNET DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "SUNDANCE NETWORK DRIVER",
+      "maintainers": [
+        "Denis Kirjanov <kirjanov@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SUNPLUS ETHERNET DRIVER",
+      "maintainers": [
+        "Wells Lu <wellslutw@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SWITCHDEV",
+      "maintainers": [
+        "Jiri Pirko <jiri@resnulli.us>",
+        "Ivan Vecera <ivecera@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SYNOPSYS DESIGNWARE ENTERPRISE ETHERNET DRIVER",
+      "maintainers": [
+        "Jose Abreu <Jose.Abreu@synopsys.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SYNOPSYS DESIGNWARE ETHERNET XPCS DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "TC subsystem",
+      "maintainers": [
+        "Jamal Hadi Salim <jhs@mojatatu.com>",
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TEAM DRIVER",
+      "maintainers": [
+        "Jiri Pirko <jiri@resnulli.us>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "TEHUTI ETHERNET DRIVER",
+      "maintainers": [
+        "Andy Gospodarek <andy@greyhouse.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TEHUTI TN40XX ETHERNET DRIVER",
+      "maintainers": [
+        "FUJITA Tomonori <fujita.tomonori@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "THUNDERBOLT NETWORK DRIVER",
+      "maintainers": [
+        "Mika Westerberg <westeri@kernel.org>",
+        "Yehezkel Bernat <YehezkelShB@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TI ETHERNET SWITCH DRIVER (CPSW)",
+      "maintainers": [],
+      "reviewers": [
+        "Siddharth Vadapalli <s-vadapalli@ti.com>",
+        "Roger Quadros <rogerq@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TI ICSSG ETHERNET DRIVER (ICSSG)",
+      "maintainers": [],
+      "reviewers": [
+        "MD Danish Anwar <danishanwar@ti.com>",
+        "Roger Quadros <rogerq@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TI ICSSM ETHERNET DRIVER (ICSSM)",
+      "maintainers": [
+        "MD Danish Anwar <danishanwar@ti.com>",
+        "Parvathi Pudi <parvathi@couthit.com>"
+      ],
+      "reviewers": [
+        "Roger Quadros <rogerq@kernel.org>",
+        "Mohan Reddy Putluru <pmohan@couthit.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TIPC NETWORK LAYER",
+      "maintainers": [
+        "Jon Maloy <jmaloy@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TULIP NETWORK DRIVERS",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "USB \"USBNET\" DRIVER FRAMEWORK",
+      "maintainers": [
+        "Oliver Neukum <oneukum@suse.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB DAVICOM DM9601 DRIVER",
+      "maintainers": [
+        "Peter Korsgaard <peter@korsgaard.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB LAN78XX ETHERNET DRIVER",
+      "maintainers": [
+        "Thangaraj Samynathan <Thangaraj.S@microchip.com>",
+        "Rengarajan Sundararajan <Rengarajan.S@microchip.com>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB PEGASUS DRIVER",
+      "maintainers": [
+        "Petko Manolov <petkan@nucleusys.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB QMI WWAN NETWORK DRIVER",
+      "maintainers": [
+        "Bjørn Mork <bjorn@mork.no>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB RTL8150 DRIVER",
+      "maintainers": [
+        "Petko Manolov <petkan@nucleusys.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB SMSC75XX ETHERNET DRIVER",
+      "maintainers": [
+        "Steve Glendinning <steve.glendinning@shawell.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USB SMSC95XX ETHERNET DRIVER",
+      "maintainers": [
+        "Steve Glendinning <steve.glendinning@shawell.net>",
+        "UNGLinuxDriver@microchip.com"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USER DATAGRAM PROTOCOL (UDP)",
+      "maintainers": [
+        "Willem de Bruijn <willemdebruijn.kernel@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VIA VELOCITY NETWORK DRIVER",
+      "maintainers": [
+        "Francois Romieu <romieu@fr.zoreil.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VIRTIO AND VHOST VSOCK DRIVER",
+      "maintainers": [
+        "Stefan Hajnoczi <stefanha@redhat.com>",
+        "Stefano Garzarella <sgarzare@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VIRTIO HOST (VHOST)",
+      "maintainers": [
+        "\"Michael S. Tsirkin\" <mst@redhat.com>",
+        "Jason Wang <jasowang@redhat.com>"
+      ],
+      "reviewers": [
+        "Eugenio Pérez <eperezma@redhat.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VIRTIO NET DRIVER",
+      "maintainers": [
+        "\"Michael S. Tsirkin\" <mst@redhat.com>",
+        "Jason Wang <jasowang@redhat.com>"
+      ],
+      "reviewers": [
+        "Xuan Zhuo <xuanzhuo@linux.alibaba.com>",
+        "Eugenio Pérez <eperezma@redhat.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VM SOCKETS (AF_VSOCK)",
+      "maintainers": [
+        "Stefano Garzarella <sgarzare@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VMWARE VIRTUAL PTP CLOCK DRIVER",
+      "maintainers": [
+        "Nick Shi <nick.shi@broadcom.com>"
+      ],
+      "reviewers": [
+        "Ajay Kaher <ajay.kaher@broadcom.com>",
+        "Alexey Makhalov <alexey.makhalov@broadcom.com>",
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VMWARE VMXNET3 ETHERNET DRIVER",
+      "maintainers": [
+        "Ronak Doshi <ronak.doshi@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VRF",
+      "maintainers": [
+        "David Ahern <dsahern@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "WANGXUN ETHERNET DRIVER",
+      "maintainers": [
+        "Jiawen Wu <jiawenwu@trustnetic.com>",
+        "Mengyuan Lou <mengyuanlou@net-swift.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "WIREGUARD SECURE NETWORK TUNNEL",
+      "maintainers": [
+        "Jason A. Donenfeld <Jason@zx2c4.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "WWAN DRIVERS",
+      "maintainers": [
+        "Loic Poulain <loic.poulain@oss.qualcomm.com>",
+        "Sergey Ryazanov <ryazanov.s.a@gmail.com>"
+      ],
+      "reviewers": [
+        "Johannes Berg <johannes@sipsolutions.net>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "XDP (eXpress Data Path)",
+      "maintainers": [
+        "Alexei Starovoitov <ast@kernel.org>",
+        "Daniel Borkmann <daniel@iogearbox.net>",
+        "David S. Miller <davem@davemloft.net>",
+        "Jakub Kicinski <kuba@kernel.org>",
+        "Jesper Dangaard Brouer <hawk@kernel.org>",
+        "John Fastabend <john.fastabend@gmail.com>"
+      ],
+      "reviewers": [
+        "Stanislav Fomichev <sdf@fomichev.me>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "XDP SOCKETS (AF_XDP)",
+      "maintainers": [
+        "Magnus Karlsson <magnus.karlsson@intel.com>",
+        "Maciej Fijalkowski <maciej.fijalkowski@intel.com>"
+      ],
+      "reviewers": [
+        "Stanislav Fomichev <sdf@fomichev.me>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "XEN NETWORK BACKEND DRIVER",
+      "maintainers": [
+        "Wei Liu <wei.liu@kernel.org>",
+        "Paul Durrant <paul@xen.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "XILINX LL TEMAC ETHERNET DRIVER",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    }
+  ],
+  "linux-kernel@vger.kernel.org": [
+    {
+      "subsystem": "AMD NODE DRIVER",
+      "maintainers": [
+        "Mario Limonciello <mario.limonciello@amd.com>",
+        "Yazen Ghannam <yazen.ghannam@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ANDROID DRIVERS",
+      "maintainers": [
+        "Greg Kroah-Hartman <gregkh@linuxfoundation.org>",
+        "Arve Hjønnevåg <arve@android.com>",
+        "Todd Kjos <tkjos@android.com>",
+        "Christian Brauner <christian@brauner.io>",
+        "Carlos Llamas <cmllamas@google.com>",
+        "Alice Ryhl <aliceryhl@google.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ARM/Mediatek SoC support",
+      "maintainers": [
+        "Matthias Brugger <matthias.bgg@gmail.com>",
+        "AngeloGioacchino Del Regno <angelogioacchino.delregno@collabora.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ARM/TEXAS INSTRUMENT AEMIF/EMIF DRIVERS",
+      "maintainers": [
+        "Santosh Shilimkar <ssantosh@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ARM/TEXAS INSTRUMENT KEYSTONE CLOCK FRAMEWORK",
+      "maintainers": [
+        "Santosh Shilimkar <ssantosh@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ARM/TEXAS INSTRUMENT KEYSTONE CLOCKSOURCE",
+      "maintainers": [
+        "Santosh Shilimkar <ssantosh@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ARM/TEXAS INSTRUMENT KEYSTONE RESET DRIVER",
+      "maintainers": [
+        "Santosh Shilimkar <ssantosh@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ATOMIC INFRASTRUCTURE",
+      "maintainers": [
+        "Will Deacon <will@kernel.org>",
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Boqun Feng <boqun@kernel.org>"
+      ],
+      "reviewers": [
+        "Mark Rutland <mark.rutland@arm.com>",
+        "Gary Guo <gary@garyguo.net>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM BRCMSTB USB2 and USB3 PHY DRIVER",
+      "maintainers": [
+        "Justin Chen <justin.chen@broadcom.com>",
+        "Al Cooper <alcooperx@gmail.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CANAAN/KENDRYTE K210 SOC RESET CONTROLLER DRIVER",
+      "maintainers": [
+        "Damien Le Moal <dlemoal@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CLOCKSOURCE, CLOCKEVENT DRIVERS",
+      "maintainers": [
+        "Daniel Lezcano <daniel.lezcano@kernel.org>",
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "CPU HOTPLUG",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>",
+        "Peter Zijlstra <peterz@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DEBUGOBJECTS:",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DEVICE COREDUMP (DEV_COREDUMP)",
+      "maintainers": [
+        "Johannes Berg <johannes@sipsolutions.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DEVICE DEPENDENCY HELPER SCRIPT",
+      "maintainers": [
+        "Saravana Kannan <saravanak@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DPAA2 DATAPATH I/O (DPIO) DRIVER",
+      "maintainers": [
+        "Roy Pledge <Roy.Pledge@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "EXTERNAL CONNECTOR SUBSYSTEM (EXTCON)",
+      "maintainers": [
+        "MyungJoo Ham <myungjoo.ham@samsung.com>",
+        "Chanwoo Choi <cw00.choi@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "EXTRA BOOT CONFIG",
+      "maintainers": [
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FUNCTION HOOKS (FTRACE)",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [
+        "Mark Rutland <mark.rutland@arm.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FUTEX SUBSYSTEM",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>",
+        "Ingo Molnar <mingo@redhat.com>"
+      ],
+      "reviewers": [
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Darren Hart <dvhart@infradead.org>",
+        "Davidlohr Bueso <dave@stgolabs.net>",
+        "André Almeida <andrealmeid@igalia.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FWCTL MLX5 DRIVER",
+      "maintainers": [
+        "Saeed Mahameed <saeedm@nvidia.com>"
+      ],
+      "reviewers": [
+        "Itay Avraham <itayavr@nvidia.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FWCTL PDS DRIVER",
+      "maintainers": [
+        "Brett Creeley <brett.creeley@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "GENERIC ARCHITECTURE TOPOLOGY",
+      "maintainers": [
+        "Sudeep Holla <sudeep.holla@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "GENERIC ENTRY CODE",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>",
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Andy Lutomirski <luto@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "GENERIC VDSO LIBRARY",
+      "maintainers": [
+        "Andy Lutomirski <luto@kernel.org>",
+        "Thomas Gleixner <tglx@kernel.org>",
+        "Vincenzo Frascino <vincenzo.frascino@arm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HIGH-RESOLUTION TIMERS, TIMER WHEEL, CLOCKEVENTS",
+      "maintainers": [
+        "Anna-Maria Behnsen <anna-maria@linutronix.de>",
+        "Frederic Weisbecker <frederic@kernel.org>",
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HIKEY960 ONBOARD USB GPIO HUB DRIVER",
+      "maintainers": [
+        "John Stultz <jstultz@google.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HISILICON PTT DRIVER",
+      "maintainers": [
+        "Yicong Yang <yangyicong@hisilicon.com>",
+        "Jonathan Cameron <jonathan.cameron@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HISILICON SPMI CONTROLLER DRIVER FOR HIKEY 970",
+      "maintainers": [
+        "Mauro Carvalho Chehab <mchehab+huawei@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HISILICON SPMI PMIC DRIVER FOR HIKEY 6421v600",
+      "maintainers": [
+        "Mauro Carvalho Chehab <mchehab+huawei@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HYGON PROCESSOR SUPPORT",
+      "maintainers": [
+        "Pu Wen <puwen@hygon.cn>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HUNG TASK DETECTOR",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>"
+      ],
+      "reviewers": [
+        "Lance Yang <lance.yang@linux.dev>",
+        "Masami Hiramatsu <mhiramat@kernel.org>",
+        "Petr Mladek <pmladek@suse.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "INTEL CPU family model numbers",
+      "maintainers": [
+        "Tony Luck <tony.luck@intel.com>",
+        "x86@kernel.org"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "INTEL MANAGEMENT ENGINE (mei)",
+      "maintainers": [
+        "Alexander Usyskin <alexander.usyskin@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "INTEL MID (Mobile Internet Device) PLATFORM",
+      "maintainers": [
+        "Andy Shevchenko <andy@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "INTEL STRATIX10 FIRMWARE DRIVERS",
+      "maintainers": [
+        "Dinh Nguyen <dinguyen@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "IRQ SUBSYSTEM",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "IRQCHIP DRIVERS",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KERNEL USERMODE HELPER",
+      "maintainers": [
+        "Luis Chamberlain <mcgrof@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KPROBES",
+      "maintainers": [
+        "Naveen N Rao <naveen@kernel.org>",
+        "\"David S. Miller\" <davem@davemloft.net>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LIBRARY CODE",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LINUX KERNEL MEMORY CONSISTENCY MODEL (LKMM)",
+      "maintainers": [
+        "Alan Stern <stern@rowland.harvard.edu>",
+        "Andrea Parri <parri.andrea@gmail.com>",
+        "Will Deacon <will@kernel.org>",
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Boqun Feng <boqun@kernel.org>",
+        "Nicholas Piggin <npiggin@gmail.com>",
+        "David Howells <dhowells@redhat.com>",
+        "Jade Alglave <j.alglave@ucl.ac.uk>",
+        "Luc Maranget <luc.maranget@inria.fr>",
+        "\"Paul E. McKenney\" <paulmck@kernel.org>"
+      ],
+      "reviewers": [
+        "Akira Yokosawa <akiyks@gmail.com>",
+        "Daniel Lustig <dlustig@nvidia.com>",
+        "Joel Fernandes <joelagnelf@nvidia.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LIVE UPDATE",
+      "maintainers": [
+        "Pasha Tatashin <pasha.tatashin@soleen.com>",
+        "Mike Rapoport <rppt@kernel.org>"
+      ],
+      "reviewers": [
+        "Pratyush Yadav <pratyush@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LOCKING PRIMITIVES",
+      "maintainers": [
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Ingo Molnar <mingo@redhat.com>",
+        "Will Deacon <will@kernel.org>",
+        "Boqun Feng <boqun@kernel.org> (LOCKDEP & RUST)"
+      ],
+      "reviewers": [
+        "Waiman Long <longman@redhat.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAILBOX API",
+      "maintainers": [
+        "Jassi Brar <jassisinghbrar@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAILBOX ARM MHUv2",
+      "maintainers": [
+        "Viresh Kumar <viresh.kumar@linaro.org>",
+        "Tushar Khandelwal <Tushar.Khandelwal@arm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAILBOX ARM MHUv3",
+      "maintainers": [
+        "Sudeep Holla <sudeep.holla@kernel.org>",
+        "Cristian Marussi <cristian.marussi@arm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MAX20086 CAMERA POWER PROTECTOR DRIVER",
+      "maintainers": [
+        "Laurent Pinchart <laurent.pinchart@ideasonboard.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MAX77650 PMIC MFD DRIVER",
+      "maintainers": [
+        "Bartosz Golaszewski <brgl@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MAX77759 PMIC MFD DRIVER",
+      "maintainers": [
+        "André Draszik <andre.draszik@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MAX77802 PMIC REGULATOR DEVICE DRIVER",
+      "maintainers": [
+        "Javier Martinez Canillas <javier@dowhile0.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MAXIM MAX77838 PMIC REGULATOR DEVICE DRIVER",
+      "maintainers": [
+        "Ivaylo Ivanov <ivo.ivanov.ivanov1@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM PMIC AND MUIC DRIVERS FOR EXYNOS BASED BOARDS",
+      "maintainers": [
+        "Chanwoo Choi <cw00.choi@samsung.com>",
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMBARRIER SUPPORT",
+      "maintainers": [
+        "Mathieu Desnoyers <mathieu.desnoyers@efficios.com>",
+        "\"Paul E. McKenney\" <paulmck@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MEMORY CONTROLLER DRIVERS",
+      "maintainers": [
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROCHIP AT91 USART MFD DRIVER",
+      "maintainers": [
+        "Radu Pirea <radu_nicolae.pirea@upb.ro>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MIN HEAP",
+      "maintainers": [
+        "Kuan-Wei Chiu <visitorckw@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MODULE SUPPORT",
+      "maintainers": [
+        "Luis Chamberlain <mcgrof@kernel.org>",
+        "Petr Pavlu <petr.pavlu@suse.com>",
+        "Daniel Gomez <da.gomez@kernel.org>",
+        "Sami Tolvanen <samitolvanen@google.com>"
+      ],
+      "reviewers": [
+        "Aaron Tomlin <atomlin@atomlin.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NITRO ENCLAVES (NE)",
+      "maintainers": [
+        "Alexandru Ciobotaru <alcioa@amazon.com>"
+      ],
+      "reviewers": [
+        "The AWS Nitro Enclaves Team <aws-nitro-enclaves-devel@amazon.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "NITRO SECURE MODULE (NSM)",
+      "maintainers": [
+        "Alexander Graf <graf@amazon.com>"
+      ],
+      "reviewers": [
+        "The AWS Nitro Enclaves Team <aws-nitro-enclaves-devel@amazon.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "NOHZ, DYNTICKS SUPPORT",
+      "maintainers": [
+        "Anna-Maria Behnsen <anna-maria@linutronix.de>",
+        "Frederic Weisbecker <frederic@kernel.org>",
+        "Ingo Molnar <mingo@kernel.org>",
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NXP PTN5150A CC LOGIC AND EXTCON DRIVER",
+      "maintainers": [
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "NXP SJA1105 ETHERNET SWITCH DRIVER",
+      "maintainers": [
+        "Vladimir Oltean <olteanv@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PADATA PARALLEL EXECUTION MECHANISM",
+      "maintainers": [
+        "Steffen Klassert <steffen.klassert@secunet.com>",
+        "Daniel Jordan <daniel.m.jordan@oracle.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TASK DELAY MONITORING TOOLS",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Wang Yaxin <wang.yaxin@zte.com.cn>",
+        "Fan Yu <fan.yu9@zte.com.cn>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PERFORMANCE EVENTS SUBSYSTEM",
+      "maintainers": [
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Ingo Molnar <mingo@redhat.com>",
+        "Arnaldo Carvalho de Melo <acme@kernel.org>",
+        "Namhyung Kim <namhyung@kernel.org>"
+      ],
+      "reviewers": [
+        "Mark Rutland <mark.rutland@arm.com>",
+        "Alexander Shishkin <alexander.shishkin@linux.intel.com>",
+        "Jiri Olsa <jolsa@kernel.org>",
+        "Ian Rogers <irogers@google.com>",
+        "Adrian Hunter <adrian.hunter@intel.com>",
+        "James Clark <james.clark@linaro.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "PIDFD API",
+      "maintainers": [
+        "Christian Brauner <christian@brauner.io>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "POSIX CLOCKS and TIMERS",
+      "maintainers": [
+        "Anna-Maria Behnsen <anna-maria@linutronix.de>",
+        "Frederic Weisbecker <frederic@kernel.org>",
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PROC FILESYSTEM",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PROC SYSCTL",
+      "maintainers": [
+        "Kees Cook <kees@kernel.org>",
+        "Joel Granados <joel.granados@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QORIQ DPAA2 FSL-MC BUS DRIVER",
+      "maintainers": [
+        "Ioana Ciornei <ioana.ciornei@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RDT - RESOURCE ALLOCATION",
+      "maintainers": [
+        "Tony Luck <tony.luck@intel.com>",
+        "Reinette Chatre <reinette.chatre@intel.com>"
+      ],
+      "reviewers": [
+        "Dave Martin <Dave.Martin@arm.com>",
+        "James Morse <james.morse@arm.com>",
+        "Babu Moger <babu.moger@amd.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "Real-time Linux Analysis (RTLA) tools",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Tomas Glozar <tglozar@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "REGISTER MAP ABSTRACTION",
+      "maintainers": [
+        "Mark Brown <broonie@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "RESTARTABLE SEQUENCES SUPPORT",
+      "maintainers": [
+        "Mathieu Desnoyers <mathieu.desnoyers@efficios.com>",
+        "Peter Zijlstra <peterz@infradead.org>",
+        "\"Paul E. McKenney\" <paulmck@kernel.org>",
+        "Boqun Feng <boqun@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ROHM MULTIFUNCTION BD9571MWV-M PMIC DEVICE DRIVERS",
+      "maintainers": [
+        "Marek Vasut <marek.vasut+renesas@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "RPMB SUBSYSTEM",
+      "maintainers": [
+        "Jens Wiklander <jens.wiklander@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SAMSUNG EXYNOS ACPM MAILBOX PROTOCOL",
+      "maintainers": [
+        "Tudor Ambarus <tudor.ambarus@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SAMSUNG EXYNOS MAILBOX DRIVER",
+      "maintainers": [
+        "Tudor Ambarus <tudor.ambarus@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS",
+      "maintainers": [
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "reviewers": [
+        "André Draszik <andre.draszik@linaro.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SAMSUNG USB2 PHY DRIVER",
+      "maintainers": [
+        "Sylwester Nawrocki <s.nawrocki@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SCHEDULER",
+      "maintainers": [
+        "Ingo Molnar <mingo@redhat.com>",
+        "Peter Zijlstra <peterz@infradead.org>",
+        "Juri Lelli <juri.lelli@redhat.com> (SCHED_DEADLINE)",
+        "Vincent Guittot <vincent.guittot@linaro.org> (SCHED_NORMAL)"
+      ],
+      "reviewers": [
+        "Dietmar Eggemann <dietmar.eggemann@arm.com> (SCHED_NORMAL)",
+        "Steven Rostedt <rostedt@goodmis.org> (SCHED_FIFO/SCHED_RR)",
+        "Ben Segall <bsegall@google.com> (CONFIG_CFS_BANDWIDTH)",
+        "Mel Gorman <mgorman@suse.de> (CONFIG_NUMA_BALANCING)",
+        "Valentin Schneider <vschneid@redhat.com> (TOPOLOGY)"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SPMI SUBSYSTEM",
+      "maintainers": [
+        "Stephen Boyd <sboyd@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TI FPC202 DUAL PORT CONTROLLER",
+      "maintainers": [
+        "Romain Gantois <romain.gantois@bootlin.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TI KEYSTONE MULTICORE NAVIGATOR DRIVERS",
+      "maintainers": [
+        "Nishanth Menon <nm@ti.com>",
+        "Santosh Shilimkar <ssantosh@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TIMEKEEPING, CLOCKSOURCE CORE, NTP, ALARMTIMER",
+      "maintainers": [
+        "John Stultz <jstultz@google.com>",
+        "Thomas Gleixner <tglx@kernel.org>"
+      ],
+      "reviewers": [
+        "Stephen Boyd <sboyd@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "TORTURE-TEST MODULES",
+      "maintainers": [
+        "Davidlohr Bueso <dave@stgolabs.net>",
+        "\"Paul E. McKenney\" <paulmck@kernel.org>",
+        "Josh Triplett <josh@joshtriplett.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "TRACING",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [
+        "Mathieu Desnoyers <mathieu.desnoyers@efficios.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TRACING MMIO ACCESSES (MMIOTRACE)",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [
+        "Pekka Paalanen <ppaalanen@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TTY LAYER AND SERIAL DRIVERS",
+      "maintainers": [
+        "Greg Kroah-Hartman <gregkh@linuxfoundation.org>",
+        "Jiri Slaby <jirislaby@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "UACCE ACCELERATOR FRAMEWORK",
+      "maintainers": [
+        "Zhangfei Gao <zhangfei.gao@linaro.org>",
+        "Zhou Wang <wangzhou1@hisilicon.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "UNION-FIND",
+      "maintainers": [
+        "Xavier <xavier_qy@163.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "UPROBES",
+      "maintainers": [
+        "Masami Hiramatsu <mhiramat@kernel.org>",
+        "Oleg Nesterov <oleg@redhat.com>",
+        "Peter Zijlstra <peterz@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "UUID HELPERS",
+      "maintainers": [],
+      "reviewers": [
+        "Andy Shevchenko <andriy.shevchenko@linux.intel.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VME SUBSYSTEM",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Orphan"
+    },
+    {
+      "subsystem": "VMWARE BALLOON DRIVER",
+      "maintainers": [
+        "Jerrin Shaji George <jerrin.shaji-george@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VMWARE VMCI DRIVER",
+      "maintainers": [
+        "Bryan Tan <bryan-bt.tan@broadcom.com>",
+        "Vishnu Dasa <vishnu.dasa@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VMWARE VSOCK VMCI TRANSPORT DRIVER",
+      "maintainers": [
+        "Bryan Tan <bryan-bt.tan@broadcom.com>",
+        "Vishnu Dasa <vishnu.dasa@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VOLTAGE AND CURRENT REGULATOR FRAMEWORK",
+      "maintainers": [
+        "Liam Girdwood <lgirdwood@gmail.com>",
+        "Mark Brown <broonie@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS",
+      "maintainers": [
+        "Chen-Yu Tsai <wens@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "X86 ARCHITECTURE (32-BIT AND 64-BIT)",
+      "maintainers": [
+        "Thomas Gleixner <tglx@kernel.org>",
+        "Ingo Molnar <mingo@redhat.com>",
+        "Borislav Petkov <bp@alien8.de>",
+        "Dave Hansen <dave.hansen@linux.intel.com>",
+        "x86@kernel.org"
+      ],
+      "reviewers": [
+        "\"H. Peter Anvin\" <hpa@zytor.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "X86 ENTRY CODE",
+      "maintainers": [
+        "Andy Lutomirski <luto@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "X86 MM",
+      "maintainers": [
+        "Dave Hansen <dave.hansen@linux.intel.com>",
+        "Andy Lutomirski <luto@kernel.org>",
+        "Peter Zijlstra <peterz@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "X86 VDSO",
+      "maintainers": [
+        "Andy Lutomirski <luto@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "XILINX ZYNQMP PSGTR PHY DRIVER",
+      "maintainers": [
+        "Laurent Pinchart <laurent.pinchart@ideasonboard.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "XILLYBUS DRIVER",
+      "maintainers": [
+        "Eli Billauer <eli.billauer@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ZHAOXIN PROCESSOR SUPPORT",
+      "maintainers": [
+        "Tony W Wang-oc <TonyWWang-oc@zhaoxin.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ZRAM COMPRESSED RAM BLOCK DEVICE DRVIER",
+      "maintainers": [
+        "Minchan Kim <minchan@kernel.org>",
+        "Sergey Senozhatsky <senozhatsky@chromium.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "THE REST",
+      "maintainers": [
+        "Linus Torvalds <torvalds@linux-foundation.org>"
+      ],
+      "reviewers": [],
+      "status": "Buried alive in reporters"
+    }
+  ],
+  "stable@vger.kernel.org": [
+    {
+      "subsystem": "STABLE BRANCH",
+      "maintainers": [
+        "Greg Kroah-Hartman <gregkh@linuxfoundation.org>",
+        "Sasha Levin <sashal@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    }
+  ],
+  "loongarch@lists.linux.dev": [
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE FOR LOONGARCH (KVM/LoongArch)",
+      "maintainers": [
+        "Tianrui Zhao <zhaotianrui@loongson.cn>",
+        "Bibo Mao <maobibo@loongson.cn>",
+        "Huacai Chen <chenhuacai@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LOONGARCH",
+      "maintainers": [
+        "Huacai Chen <chenhuacai@kernel.org>"
+      ],
+      "reviewers": [
+        "WANG Xuerui <kernel@xen0n.name>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LOONGSON-2 SOC SERIES GUTS DRIVER",
+      "maintainers": [
+        "Yinbo Zhu <zhuyinbo@loongson.cn>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "linux-s390@vger.kernel.org": [
+    {
+      "subsystem": "S390 ARCHITECTURE",
+      "maintainers": [
+        "Heiko Carstens <hca@linux.ibm.com>",
+        "Vasily Gorbik <gor@linux.ibm.com>",
+        "Alexander Gordeev <agordeev@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Christian Borntraeger <borntraeger@linux.ibm.com>",
+        "Sven Schnelle <svens@linux.ibm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 COMMON I/O LAYER",
+      "maintainers": [
+        "Vineeth Vijayan <vneethv@linux.ibm.com>",
+        "Peter Oberparleiter <oberpar@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 CRYPTO MODULES, PRNG DRIVER, ARCH RANDOM",
+      "maintainers": [
+        "Harald Freudenberger <freude@linux.ibm.com>",
+        "Holger Dengler <dengler@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 DASD DRIVER",
+      "maintainers": [
+        "Stefan Haberland <sth@linux.ibm.com>",
+        "Jan Hoeppner <hoeppner@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 HWRANDOM TRNG DRIVER",
+      "maintainers": [
+        "Harald Freudenberger <freude@linux.ibm.com>",
+        "Holger Dengler <dengler@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 IOMMU (PCI)",
+      "maintainers": [
+        "Niklas Schnelle <schnelle@linux.ibm.com>",
+        "Matthew Rosato <mjrosato@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Gerald Schaefer <gerald.schaefer@linux.ibm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 IUCV NETWORK LAYER",
+      "maintainers": [
+        "Alexandra Winter <wintera@linux.ibm.com>",
+        "Thorsten Winkler <twinkler@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 MM",
+      "maintainers": [
+        "Alexander Gordeev <agordeev@linux.ibm.com>",
+        "Gerald Schaefer <gerald.schaefer@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 NETWORK DRIVERS",
+      "maintainers": [
+        "Alexandra Winter <wintera@linux.ibm.com>",
+        "Aswin Karuvally <aswin@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 PCI SUBSYSTEM",
+      "maintainers": [
+        "Niklas Schnelle <schnelle@linux.ibm.com>",
+        "Gerald Schaefer <gerald.schaefer@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 PTP DRIVER",
+      "maintainers": [
+        "Sven Schnelle <svens@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 SCM DRIVER",
+      "maintainers": [
+        "Vineeth Vijayan <vneethv@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 VFIO AP DRIVER",
+      "maintainers": [
+        "Tony Krowiak <akrowiak@linux.ibm.com>",
+        "Halil Pasic <pasic@linux.ibm.com>",
+        "Jason Herne <jjherne@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 VFIO-CCW DRIVER",
+      "maintainers": [
+        "Eric Farman <farman@linux.ibm.com>",
+        "Matthew Rosato <mjrosato@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Halil Pasic <pasic@linux.ibm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 VFIO-PCI DRIVER",
+      "maintainers": [
+        "Matthew Rosato <mjrosato@linux.ibm.com>",
+        "Farhan Ali <alifm@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Eric Farman <farman@linux.ibm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 ZCRYPT AND PKEY DRIVER AND AP BUS",
+      "maintainers": [
+        "Harald Freudenberger <freude@linux.ibm.com>",
+        "Holger Dengler <dengler@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 ZFCP DRIVER",
+      "maintainers": [
+        "Nihar Panda <niharp@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SHARED MEMORY COMMUNICATIONS (SMC) SOCKETS",
+      "maintainers": [
+        "D. Wythe <alibuda@linux.alibaba.com>",
+        "Dust Li <dust.li@linux.alibaba.com>",
+        "Sidraya Jayagond <sidraya@linux.ibm.com>",
+        "Wenjia Zhang <wenjia@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Mahanta Jambigi <mjambigi@linux.ibm.com>",
+        "Tony Lu <tonylu@linux.alibaba.com>",
+        "Wen Gu <guwen@linux.alibaba.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VIRTIO DRIVERS FOR S390",
+      "maintainers": [
+        "Cornelia Huck <cohuck@redhat.com>",
+        "Halil Pasic <pasic@linux.ibm.com>",
+        "Eric Farman <farman@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    }
+  ],
+  "linux-trace-kernel@vger.kernel.org": [
+    {
+      "subsystem": "EXTRA BOOT CONFIG",
+      "maintainers": [
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FUNCTION HOOKS (FTRACE)",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [
+        "Mark Rutland <mark.rutland@arm.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KPROBES",
+      "maintainers": [
+        "Naveen N Rao <naveen@kernel.org>",
+        "\"David S. Miller\" <davem@davemloft.net>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "Real-time Linux Analysis (RTLA) tools",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Tomas Glozar <tglozar@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RUNTIME VERIFICATION (RV)",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Gabriele Monaco <gmonaco@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TRACING",
+      "maintainers": [
+        "Steven Rostedt <rostedt@goodmis.org>",
+        "Masami Hiramatsu <mhiramat@kernel.org>"
+      ],
+      "reviewers": [
+        "Mathieu Desnoyers <mathieu.desnoyers@efficios.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TRACING [RUST]",
+      "maintainers": [
+        "Alice Ryhl <aliceryhl@google.com>",
+        "Steven Rostedt <rostedt@goodmis.org>"
+      ],
+      "reviewers": [
+        "Masami Hiramatsu <mhiramat@kernel.org>",
+        "Mathieu Desnoyers <mathieu.desnoyers@efficios.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "UPROBES",
+      "maintainers": [
+        "Masami Hiramatsu <mhiramat@kernel.org>",
+        "Oleg Nesterov <oleg@redhat.com>",
+        "Peter Zijlstra <peterz@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "linux-cxl@vger.kernel.org": [
+    {
+      "subsystem": "COMPUTE EXPRESS LINK (CXL)",
+      "maintainers": [
+        "Davidlohr Bueso <dave@stgolabs.net>",
+        "Jonathan Cameron <jonathan.cameron@huawei.com>",
+        "Dave Jiang <dave.jiang@intel.com>",
+        "Alison Schofield <alison.schofield@intel.com>",
+        "Vishal Verma <vishal.l.verma@intel.com>",
+        "Ira Weiny <ira.weiny@intel.com>",
+        "Dan Williams <dan.j.williams@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "COMPUTE EXPRESS LINK PMU (CPMU)",
+      "maintainers": [
+        "Jonathan Cameron <jonathan.cameron@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DEVICE DIRECT ACCESS (DAX)",
+      "maintainers": [
+        "Dan Williams <dan.j.williams@intel.com>",
+        "Vishal Verma <vishal.l.verma@intel.com>",
+        "Dave Jiang <dave.jiang@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MEMORY HOT(UN)PLUG",
+      "maintainers": [
+        "David Hildenbrand <david@kernel.org>",
+        "Oscar Salvador <osalvador@suse.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "nvdimm@lists.linux.dev": [
+    {
+      "subsystem": "DEVICE DIRECT ACCESS (DAX)",
+      "maintainers": [
+        "Dan Williams <dan.j.williams@intel.com>",
+        "Vishal Verma <vishal.l.verma@intel.com>",
+        "Dave Jiang <dave.jiang@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "FILESYSTEM DIRECT ACCESS (DAX)",
+      "maintainers": [
+        "Dan Williams <dan.j.williams@intel.com>"
+      ],
+      "reviewers": [
+        "Matthew Wilcox <willy@infradead.org>",
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LIBNVDIMM BTT: BLOCK TRANSLATION TABLE",
+      "maintainers": [
+        "Vishal Verma <vishal.l.verma@intel.com>",
+        "Dan Williams <dan.j.williams@intel.com>",
+        "Dave Jiang <dave.jiang@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LIBNVDIMM PMEM: PERSISTENT MEMORY DRIVER",
+      "maintainers": [
+        "Dan Williams <dan.j.williams@intel.com>",
+        "Vishal Verma <vishal.l.verma@intel.com>",
+        "Dave Jiang <dave.jiang@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LIBNVDIMM: DEVICETREE BINDINGS",
+      "maintainers": [
+        "Oliver O'Halloran <oohall@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "LIBNVDIMM: NON-VOLATILE MEMORY DEVICE SUBSYSTEM",
+      "maintainers": [
+        "Dan Williams <dan.j.williams@intel.com>",
+        "Vishal Verma <vishal.l.verma@intel.com>",
+        "Dave Jiang <dave.jiang@intel.com>",
+        "Ira Weiny <ira.weiny@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    }
+  ],
+  "linux-btrfs@vger.kernel.org": [
+    {
+      "subsystem": "BTRFS FILE SYSTEM",
+      "maintainers": [
+        "Chris Mason <clm@fb.com>",
+        "David Sterba <dsterba@suse.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "io-uring@vger.kernel.org": [
+    {
+      "subsystem": "IO_URING",
+      "maintainers": [
+        "Jens Axboe <axboe@kernel.dk>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "IO_URING ZCRX",
+      "maintainers": [
+        "Pavel Begunkov <asml.silence@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "workflows@vger.kernel.org": [
+    {
+      "subsystem": "DOCUMENTATION PROCESS",
+      "maintainers": [
+        "Jonathan Corbet <corbet@lwn.net>"
+      ],
+      "reviewers": [
+        "Shuah Khan <skhan@linuxfoundation.org>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "cgroups@vger.kernel.org": [
+    {
+      "subsystem": "CONTROL GROUP (CGROUP)",
+      "maintainers": [
+        "Tejun Heo <tj@kernel.org>",
+        "Johannes Weiner <hannes@cmpxchg.org>",
+        "Michal Koutný <mkoutny@suse.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CONTROL GROUP - BLOCK IO CONTROLLER (BLKIO)",
+      "maintainers": [
+        "Tejun Heo <tj@kernel.org>",
+        "Josef Bacik <josef@toxicpanda.com>",
+        "Jens Axboe <axboe@kernel.dk>"
+      ],
+      "reviewers": [],
+      "status": ""
+    },
+    {
+      "subsystem": "CONTROL GROUP - CPUSET",
+      "maintainers": [
+        "Waiman Long <longman@redhat.com>"
+      ],
+      "reviewers": [
+        "Chen Ridong <chenridong@huaweicloud.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CONTROL GROUP - DEVICE MEMORY CONTROLLER (DMEM)",
+      "maintainers": [
+        "Maarten Lankhorst <dev@lankhorst.se>",
+        "Maxime Ripard <mripard@kernel.org>",
+        "Natalie Vock <natalie.vock@gmx.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CONTROL GROUP - MEMORY RESOURCE CONTROLLER (MEMCG)",
+      "maintainers": [
+        "Johannes Weiner <hannes@cmpxchg.org>",
+        "Michal Hocko <mhocko@kernel.org>",
+        "Roman Gushchin <roman.gushchin@linux.dev>",
+        "Shakeel Butt <shakeel.butt@linux.dev>"
+      ],
+      "reviewers": [
+        "Muchun Song <muchun.song@linux.dev>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "linux-efi@vger.kernel.org": [
+    {
+      "subsystem": "EFI TEST DRIVER",
+      "maintainers": [
+        "Ivan Hu <ivan.hu@canonical.com>",
+        "Ard Biesheuvel <ardb@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "EFI VARIABLE FILESYSTEM",
+      "maintainers": [
+        "Jeremy Kerr <jk@ozlabs.org>",
+        "Ard Biesheuvel <ardb@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "EXTENSIBLE FIRMWARE INTERFACE (EFI)",
+      "maintainers": [
+        "Ard Biesheuvel <ardb@kernel.org>"
+      ],
+      "reviewers": [
+        "Ilias Apalodimas <ilias.apalodimas@linaro.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "GUID PARTITION TABLE (GPT)",
+      "maintainers": [
+        "Davidlohr Bueso <dave@stgolabs.net>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "bpf@vger.kernel.org": [
+    {
+      "subsystem": "BPF JIT for ARC",
+      "maintainers": [
+        "Shahab Vahedi <list+bpf@vahedi.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF JIT for ARM",
+      "maintainers": [
+        "Russell King <linux@armlinux.org.uk>",
+        "Puranjay Mohan <puranjay@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF JIT for ARM64",
+      "maintainers": [
+        "Daniel Borkmann <daniel@iogearbox.net>",
+        "Alexei Starovoitov <ast@kernel.org>",
+        "Puranjay Mohan <puranjay@kernel.org>"
+      ],
+      "reviewers": [
+        "Xu Kuohai <xukuohai@huaweicloud.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF JIT for LOONGARCH",
+      "maintainers": [
+        "Tiezhu Yang <yangtiezhu@loongson.cn>"
+      ],
+      "reviewers": [
+        "Hengqi Chen <hengqi.chen@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF JIT for MIPS (32-BIT AND 64-BIT)",
+      "maintainers": [
+        "Johan Almbladh <johan.almbladh@anyfinetworks.com>",
+        "Paul Burton <paulburton@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF JIT for NFP NICs",
+      "maintainers": [
+        "Jakub Kicinski <kuba@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "BPF JIT for POWERPC (32-BIT AND 64-BIT)",
+      "maintainers": [
+        "Hari Bathini <hbathini@linux.ibm.com>",
+        "Christophe Leroy (CS GROUP) <chleroy@kernel.org>"
+      ],
+      "reviewers": [
+        "Naveen N Rao <naveen@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF JIT for RISC-V (32-bit)",
+      "maintainers": [
+        "Luke Nelson <luke.r.nels@gmail.com>",
+        "Xi Wang <xi.wang@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF JIT for RISC-V (64-bit)",
+      "maintainers": [
+        "Björn Töpel <bjorn@kernel.org>"
+      ],
+      "reviewers": [
+        "Pu Lehui <pulehui@huawei.com>",
+        "Puranjay Mohan <puranjay@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF JIT for S390",
+      "maintainers": [
+        "Ilya Leoshkevich <iii@linux.ibm.com>",
+        "Heiko Carstens <hca@linux.ibm.com>",
+        "Vasily Gorbik <gor@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF JIT for SPARC (32-BIT AND 64-BIT)",
+      "maintainers": [
+        "David S. Miller <davem@davemloft.net>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "BPF JIT for X86 32-BIT",
+      "maintainers": [
+        "Wang YanQing <udknight@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "BPF JIT for X86 64-BIT",
+      "maintainers": [
+        "Alexei Starovoitov <ast@kernel.org>",
+        "Daniel Borkmann <daniel@iogearbox.net>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF [BTF]",
+      "maintainers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [CORE]",
+      "maintainers": [
+        "Alexei Starovoitov <ast@kernel.org>",
+        "Daniel Borkmann <daniel@iogearbox.net>"
+      ],
+      "reviewers": [
+        "John Fastabend <john.fastabend@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [CRYPTO]",
+      "maintainers": [
+        "Vadim Fedorenko <vadim.fedorenko@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [DOCUMENTATION] (Related to Standardization)",
+      "maintainers": [],
+      "reviewers": [
+        "David Vernet <void@manifault.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [GENERAL] (Safe Dynamic Programs and Tools)",
+      "maintainers": [
+        "Alexei Starovoitov <ast@kernel.org>",
+        "Daniel Borkmann <daniel@iogearbox.net>",
+        "Andrii Nakryiko <andrii@kernel.org>"
+      ],
+      "reviewers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>",
+        "Eduard Zingerman <eddyz87@gmail.com>",
+        "Song Liu <song@kernel.org>",
+        "Yonghong Song <yonghong.song@linux.dev>",
+        "John Fastabend <john.fastabend@gmail.com>",
+        "KP Singh <kpsingh@kernel.org>",
+        "Stanislav Fomichev <sdf@fomichev.me>",
+        "Hao Luo <haoluo@google.com>",
+        "Jiri Olsa <jolsa@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF [ITERATOR]",
+      "maintainers": [
+        "Yonghong Song <yonghong.song@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [L7 FRAMEWORK] (sockmap)",
+      "maintainers": [
+        "John Fastabend <john.fastabend@gmail.com>",
+        "Jakub Sitnicki <jakub@cloudflare.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [LIBRARY] (libbpf)",
+      "maintainers": [
+        "Andrii Nakryiko <andrii@kernel.org>",
+        "Eduard Zingerman <eddyz87@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [MEMORY MANAGEMENT EXTENSIONS]",
+      "maintainers": [
+        "Roman Gushchin <roman.gushchin@linux.dev>",
+        "JP Kobryn <inwardvessel@gmail.com>",
+        "Shakeel Butt <shakeel.butt@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [MISC]",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "BPF [NETKIT] (BPF-programmable network device)",
+      "maintainers": [
+        "Daniel Borkmann <daniel@iogearbox.net>",
+        "Nikolay Aleksandrov <razor@blackwall.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BPF [NETWORKING] (struct_ops, reuseport)",
+      "maintainers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [NETWORKING] (tcx & tc BPF, sock_addr)",
+      "maintainers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>",
+        "Daniel Borkmann <daniel@iogearbox.net>"
+      ],
+      "reviewers": [
+        "John Fastabend <john.fastabend@gmail.com>",
+        "Stanislav Fomichev <sdf@fomichev.me>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [RINGBUF]",
+      "maintainers": [
+        "Andrii Nakryiko <andrii@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [SECURITY & LSM] (Security Audit and Enforcement using BPF)",
+      "maintainers": [
+        "KP Singh <kpsingh@kernel.org>",
+        "Matt Bobrowski <mattbobrowski@google.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [SELFTESTS] (Test Runners & Infrastructure)",
+      "maintainers": [
+        "Andrii Nakryiko <andrii@kernel.org>",
+        "Eduard Zingerman <eddyz87@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [STORAGE & CGROUPS]",
+      "maintainers": [
+        "Martin KaFai Lau <martin.lau@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [TOOLING] (bpftool)",
+      "maintainers": [
+        "Quentin Monnet <qmo@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BPF [TRACING]",
+      "maintainers": [
+        "Song Liu <song@kernel.org>"
+      ],
+      "reviewers": [
+        "Jiri Olsa <jolsa@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "XDP (eXpress Data Path)",
+      "maintainers": [
+        "Alexei Starovoitov <ast@kernel.org>",
+        "Daniel Borkmann <daniel@iogearbox.net>",
+        "David S. Miller <davem@davemloft.net>",
+        "Jakub Kicinski <kuba@kernel.org>",
+        "Jesper Dangaard Brouer <hawk@kernel.org>",
+        "John Fastabend <john.fastabend@gmail.com>"
+      ],
+      "reviewers": [
+        "Stanislav Fomichev <sdf@fomichev.me>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "XDP SOCKETS (AF_XDP)",
+      "maintainers": [
+        "Magnus Karlsson <magnus.karlsson@intel.com>",
+        "Maciej Fijalkowski <maciej.fijalkowski@intel.com>"
+      ],
+      "reviewers": [
+        "Stanislav Fomichev <sdf@fomichev.me>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "linux-mm@kvack.org": [
+    {
+      "subsystem": "BPF [MEMORY MANAGEMENT EXTENSIONS]",
+      "maintainers": [
+        "Roman Gushchin <roman.gushchin@linux.dev>",
+        "JP Kobryn <inwardvessel@gmail.com>",
+        "Shakeel Butt <shakeel.butt@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CACHESTAT: PAGE CACHE STATS FOR A FILE",
+      "maintainers": [
+        "Nhat Pham <nphamcs@gmail.com>",
+        "Johannes Weiner <hannes@cmpxchg.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CONTROL GROUP - MEMORY RESOURCE CONTROLLER (MEMCG)",
+      "maintainers": [
+        "Johannes Weiner <hannes@cmpxchg.org>",
+        "Michal Hocko <mhocko@kernel.org>",
+        "Roman Gushchin <roman.gushchin@linux.dev>",
+        "Shakeel Butt <shakeel.butt@linux.dev>"
+      ],
+      "reviewers": [
+        "Muchun Song <muchun.song@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DAMON",
+      "maintainers": [
+        "SeongJae Park <sj@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "EXEC & BINFMT API, ELF",
+      "maintainers": [
+        "Kees Cook <kees@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "HMM - Heterogeneous Memory Management",
+      "maintainers": [
+        "Jason Gunthorpe <jgg@nvidia.com>",
+        "Leon Romanovsky <leonro@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HUGETLB SUBSYSTEM",
+      "maintainers": [
+        "Muchun Song <muchun.song@linux.dev>",
+        "Oscar Salvador <osalvador@suse.de>"
+      ],
+      "reviewers": [
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HWPOISON MEMORY FAILURE HANDLING",
+      "maintainers": [
+        "Miaohe Lin <linmiaohe@huawei.com>"
+      ],
+      "reviewers": [
+        "Naoya Horiguchi <nao.horiguchi@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KEXEC HANDOVER (KHO)",
+      "maintainers": [
+        "Alexander Graf <graf@amazon.com>",
+        "Mike Rapoport <rppt@kernel.org>",
+        "Pasha Tatashin <pasha.tatashin@soleen.com>"
+      ],
+      "reviewers": [
+        "Pratyush Yadav <pratyush@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAPLE TREE",
+      "maintainers": [
+        "Liam R. Howlett <Liam.Howlett@oracle.com>"
+      ],
+      "reviewers": [
+        "Alice Ryhl <aliceryhl@google.com>",
+        "Andrew Ballance <andrewjballance@gmail.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "MEMBLOCK AND MEMORY MANAGEMENT INITIALIZATION",
+      "maintainers": [
+        "Mike Rapoport <rppt@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY ALLOCATION PROFILING",
+      "maintainers": [
+        "Suren Baghdasaryan <surenb@google.com>",
+        "Kent Overstreet <kent.overstreet@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY HOT(UN)PLUG",
+      "maintainers": [
+        "David Hildenbrand <david@kernel.org>",
+        "Oscar Salvador <osalvador@suse.de>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - BALLOON",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - CORE",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Mike Rapoport <rppt@kernel.org>",
+        "Suren Baghdasaryan <surenb@google.com>",
+        "Michal Hocko <mhocko@suse.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - EXECMEM",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Mike Rapoport <rppt@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - GUP (GET USER PAGES)",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [
+        "Jason Gunthorpe <jgg@nvidia.com>",
+        "John Hubbard <jhubbard@nvidia.com>",
+        "Peter Xu <peterx@redhat.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - KSM (Kernel Samepage Merging)",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [
+        "Xu Xin <xu.xin16@zte.com.cn>",
+        "Chengming Zhou <chengming.zhou@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - MEMORY POLICY AND MIGRATION",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [
+        "Zi Yan <ziy@nvidia.com>",
+        "Matthew Brost <matthew.brost@intel.com>",
+        "Joshua Hahn <joshua.hahnjy@gmail.com>",
+        "Rakie Kim <rakie.kim@sk.com>",
+        "Byungchul Park <byungchul@sk.com>",
+        "Gregory Price <gourry@gourry.net>",
+        "Ying Huang <ying.huang@linux.alibaba.com>",
+        "Alistair Popple <apopple@nvidia.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - MGLRU (MULTI-GEN LRU)",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Axel Rasmussen <axelrasmussen@google.com>",
+        "Yuanchu Xie <yuanchu@google.com>"
+      ],
+      "reviewers": [
+        "Wei Xu <weixugc@google.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - MISC",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Mike Rapoport <rppt@kernel.org>",
+        "Suren Baghdasaryan <surenb@google.com>",
+        "Michal Hocko <mhocko@suse.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - NUMA MEMBLOCKS AND NUMA EMULATION",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Mike Rapoport <rppt@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - OOM KILLER",
+      "maintainers": [
+        "Michal Hocko <mhocko@suse.com>"
+      ],
+      "reviewers": [
+        "David Rientjes <rientjes@google.com>",
+        "Shakeel Butt <shakeel.butt@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - PAGE ALLOCATOR",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Vlastimil Babka <vbabka@kernel.org>"
+      ],
+      "reviewers": [
+        "Suren Baghdasaryan <surenb@google.com>",
+        "Michal Hocko <mhocko@suse.com>",
+        "Brendan Jackman <jackmanb@google.com>",
+        "Johannes Weiner <hannes@cmpxchg.org>",
+        "Zi Yan <ziy@nvidia.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - RECLAIM",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Johannes Weiner <hannes@cmpxchg.org>"
+      ],
+      "reviewers": [
+        "David Hildenbrand <david@kernel.org>",
+        "Michal Hocko <mhocko@kernel.org>",
+        "Qi Zheng <zhengqi.arch@bytedance.com>",
+        "Shakeel Butt <shakeel.butt@linux.dev>",
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - RMAP (REVERSE MAPPING)",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>",
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>"
+      ],
+      "reviewers": [
+        "Rik van Riel <riel@surriel.com>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Harry Yoo <harry.yoo@oracle.com>",
+        "Jann Horn <jannh@google.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - SECRETMEM",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Mike Rapoport <rppt@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - SWAP",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Chris Li <chrisl@kernel.org>",
+        "Kairui Song <kasong@tencent.com>"
+      ],
+      "reviewers": [
+        "Kemeng Shi <shikemeng@huaweicloud.com>",
+        "Nhat Pham <nphamcs@gmail.com>",
+        "Baoquan He <bhe@redhat.com>",
+        "Barry Song <baohua@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - THP (TRANSPARENT HUGE PAGE)",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "David Hildenbrand <david@kernel.org>",
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>"
+      ],
+      "reviewers": [
+        "Zi Yan <ziy@nvidia.com>",
+        "Baolin Wang <baolin.wang@linux.alibaba.com>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Nico Pache <npache@redhat.com>",
+        "Ryan Roberts <ryan.roberts@arm.com>",
+        "Dev Jain <dev.jain@arm.com>",
+        "Barry Song <baohua@kernel.org>",
+        "Lance Yang <lance.yang@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - USERFAULTFD",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Mike Rapoport <rppt@kernel.org>"
+      ],
+      "reviewers": [
+        "Peter Xu <peterx@redhat.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MANAGEMENT - RUST",
+      "maintainers": [
+        "Alice Ryhl <aliceryhl@google.com>"
+      ],
+      "reviewers": [
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MAPPING",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>"
+      ],
+      "reviewers": [
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Jann Horn <jannh@google.com>",
+        "Pedro Falcato <pfalcato@suse.de>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MAPPING - LOCKING",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Suren Baghdasaryan <surenb@google.com>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>"
+      ],
+      "reviewers": [
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Shakeel Butt <shakeel.butt@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY MAPPING - MADVISE (MEMORY ADVICE)",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Liam R. Howlett <Liam.Howlett@oracle.com>",
+        "Lorenzo Stoakes <lorenzo.stoakes@oracle.com>",
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "reviewers": [
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Jann Horn <jannh@google.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MMU GATHER AND TLB INVALIDATION",
+      "maintainers": [
+        "Will Deacon <will@kernel.org>",
+        "\"Aneesh Kumar K.V\" <aneesh.kumar@kernel.org>",
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Nick Piggin <npiggin@gmail.com>",
+        "Peter Zijlstra <peterz@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PAGE TABLE CHECK",
+      "maintainers": [
+        "Pasha Tatashin <pasha.tatashin@soleen.com>",
+        "Andrew Morton <akpm@linux-foundation.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PER-CPU MEMORY ALLOCATOR",
+      "maintainers": [
+        "Dennis Zhou <dennis@kernel.org>",
+        "Tejun Heo <tj@kernel.org>",
+        "Christoph Lameter <cl@gentwo.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SHRINKER",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Dave Chinner <david@fromorbit.com>"
+      ],
+      "reviewers": [
+        "Qi Zheng <zhengqi.arch@bytedance.com>",
+        "Roman Gushchin <roman.gushchin@linux.dev>",
+        "Muchun Song <muchun.song@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SLAB ALLOCATOR",
+      "maintainers": [
+        "Vlastimil Babka <vbabka@kernel.org>",
+        "Andrew Morton <akpm@linux-foundation.org>"
+      ],
+      "reviewers": [
+        "Christoph Lameter <cl@gentwo.org>",
+        "David Rientjes <rientjes@google.com>",
+        "Roman Gushchin <roman.gushchin@linux.dev>",
+        "Harry Yoo <harry.yoo@oracle.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TMPFS (SHMEM FILESYSTEM)",
+      "maintainers": [
+        "Hugh Dickins <hughd@google.com>"
+      ],
+      "reviewers": [
+        "Baolin Wang <baolin.wang@linux.alibaba.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VMALLOC",
+      "maintainers": [
+        "Andrew Morton <akpm@linux-foundation.org>",
+        "Uladzislau Rezki <urezki@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "XARRAY",
+      "maintainers": [
+        "Matthew Wilcox <willy@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ZSMALLOC COMPRESSED SLAB MEMORY ALLOCATOR",
+      "maintainers": [
+        "Minchan Kim <minchan@kernel.org>",
+        "Sergey Senozhatsky <senozhatsky@chromium.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ZSWAP COMPRESSED SWAP CACHING",
+      "maintainers": [
+        "Johannes Weiner <hannes@cmpxchg.org>",
+        "Yosry Ahmed <yosry@kernel.org>",
+        "Nhat Pham <nphamcs@gmail.com>"
+      ],
+      "reviewers": [
+        "Chengming Zhou <chengming.zhou@linux.dev>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "kvm@vger.kernel.org": [
+    {
+      "subsystem": "GENERIC UIO DRIVER FOR PCI DEVICES",
+      "maintainers": [
+        "\"Michael S. Tsirkin\" <mst@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE (KVM)",
+      "maintainers": [
+        "Paolo Bonzini <pbonzini@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE FOR LOONGARCH (KVM/LoongArch)",
+      "maintainers": [
+        "Tianrui Zhao <zhaotianrui@loongson.cn>",
+        "Bibo Mao <maobibo@loongson.cn>",
+        "Huacai Chen <chenhuacai@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE FOR MIPS (KVM/mips)",
+      "maintainers": [
+        "Huacai Chen <chenhuacai@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE FOR POWERPC (KVM/powerpc)",
+      "maintainers": [
+        "Madhavan Srinivasan <maddy@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Nicholas Piggin <npiggin@gmail.com>"
+      ],
+      "status": "Orphan (Book3E and 32-bit)"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE FOR RISC-V (KVM/riscv)",
+      "maintainers": [
+        "Anup Patel <anup@brainfault.org>"
+      ],
+      "reviewers": [
+        "Atish Patra <atish.patra@linux.dev>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE for s390 (KVM/s390)",
+      "maintainers": [
+        "Christian Borntraeger <borntraeger@linux.ibm.com>",
+        "Janosch Frank <frankja@linux.ibm.com>",
+        "Claudio Imbrenda <imbrenda@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "David Hildenbrand <david@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KERNEL VIRTUAL MACHINE FOR X86 (KVM/x86)",
+      "maintainers": [
+        "Sean Christopherson <seanjc@google.com>",
+        "Paolo Bonzini <pbonzini@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KVM PARAVIRT (KVM/paravirt)",
+      "maintainers": [
+        "Paolo Bonzini <pbonzini@redhat.com>"
+      ],
+      "reviewers": [
+        "Vitaly Kuznetsov <vkuznets@redhat.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KVM X86 HYPER-V (KVM/hyper-v)",
+      "maintainers": [
+        "Vitaly Kuznetsov <vkuznets@redhat.com>",
+        "Sean Christopherson <seanjc@google.com>",
+        "Paolo Bonzini <pbonzini@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KVM X86 Xen (KVM/Xen)",
+      "maintainers": [
+        "David Woodhouse <dwmw2@infradead.org>",
+        "Paul Durrant <paul@xen.org>",
+        "Sean Christopherson <seanjc@google.com>",
+        "Paolo Bonzini <pbonzini@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 VFIO-CCW DRIVER",
+      "maintainers": [
+        "Eric Farman <farman@linux.ibm.com>",
+        "Matthew Rosato <mjrosato@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Halil Pasic <pasic@linux.ibm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "S390 VFIO-PCI DRIVER",
+      "maintainers": [
+        "Matthew Rosato <mjrosato@linux.ibm.com>",
+        "Farhan Ali <alifm@linux.ibm.com>"
+      ],
+      "reviewers": [
+        "Eric Farman <farman@linux.ibm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VFIO CDX DRIVER",
+      "maintainers": [
+        "Nipun Gupta <nipun.gupta@amd.com>",
+        "Nikhil Agarwal <nikhil.agarwal@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO DRIVER",
+      "maintainers": [
+        "Alex Williamson <alex@shazbot.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO FSL-MC DRIVER",
+      "maintainers": [
+        "Ioana Ciornei <ioana.ciornei@nxp.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO HISILICON PCI DRIVER",
+      "maintainers": [
+        "Longfang Liu <liulongfang@huawei.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO MEDIATED DEVICE DRIVERS",
+      "maintainers": [
+        "Kirti Wankhede <kwankhede@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO MLX5 PCI DRIVER",
+      "maintainers": [
+        "Yishai Hadas <yishaih@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO NVIDIA GRACE GPU DRIVER",
+      "maintainers": [
+        "Ankit Agrawal <ankita@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VFIO PCI DEVICE SPECIFIC DRIVERS",
+      "maintainers": [],
+      "reviewers": [
+        "Jason Gunthorpe <jgg@nvidia.com>",
+        "Yishai Hadas <yishaih@nvidia.com>",
+        "Shameer Kolothum <skolothumtho@nvidia.com>",
+        "Kevin Tian <kevin.tian@intel.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO PDS PCI DRIVER",
+      "maintainers": [
+        "Brett Creeley <brett.creeley@amd.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO PLATFORM DRIVER",
+      "maintainers": [
+        "Eric Auger <eric.auger@redhat.com>"
+      ],
+      "reviewers": [
+        "Mostafa Saleh <smostafa@google.com>",
+        "Pranjal Shrivastava <praan@google.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO QAT PCI DRIVER",
+      "maintainers": [
+        "Giovanni Cabiddu <giovanni.cabiddu@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VFIO SELFTESTS",
+      "maintainers": [
+        "David Matlack <dmatlack@google.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO VIRTIO PCI DRIVER",
+      "maintainers": [
+        "Yishai Hadas <yishaih@nvidia.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VFIO XE PCI DRIVER",
+      "maintainers": [
+        "Michał Winiarski <michal.winiarski@intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VIRT LIB",
+      "maintainers": [
+        "Alex Williamson <alex@shazbot.org>",
+        "Paolo Bonzini <pbonzini@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VIRTIO AND VHOST VSOCK DRIVER",
+      "maintainers": [
+        "Stefan Hajnoczi <stefanha@redhat.com>",
+        "Stefano Garzarella <sgarzare@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VIRTIO DRIVERS FOR S390",
+      "maintainers": [
+        "Cornelia Huck <cohuck@redhat.com>",
+        "Halil Pasic <pasic@linux.ibm.com>",
+        "Eric Farman <farman@linux.ibm.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VIRTIO HOST (VHOST)",
+      "maintainers": [
+        "\"Michael S. Tsirkin\" <mst@redhat.com>",
+        "Jason Wang <jasowang@redhat.com>"
+      ],
+      "reviewers": [
+        "Eugenio Pérez <eperezma@redhat.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "X86 TRUST DOMAIN EXTENSIONS (TDX)",
+      "maintainers": [
+        "Kiryl Shutsemau <kas@kernel.org>"
+      ],
+      "reviewers": [
+        "Dave Hansen <dave.hansen@linux.intel.com>",
+        "Rick Edgecombe <rick.p.edgecombe@intel.com>"
+      ],
+      "status": "Supported"
+    }
+  ],
+  "oe-kbuild-all@lists.linux.dev": [],
+  "linux-rt-devel@lists.linux.dev": [
+    {
+      "subsystem": "Real-time Linux (PREEMPT_RT)",
+      "maintainers": [
+        "Sebastian Andrzej Siewior <bigeasy@linutronix.de>",
+        "Clark Williams <clrkwllms@kernel.org>",
+        "Steven Rostedt <rostedt@goodmis.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    }
+  ],
+  "damon@lists.linux.dev": [
+    {
+      "subsystem": "DAMON",
+      "maintainers": [
+        "SeongJae Park <sj@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "llvm@lists.linux.dev": [
+    {
+      "subsystem": "CLANG CONTEXT ANALYSIS",
+      "maintainers": [
+        "Marco Elver <elver@google.com>"
+      ],
+      "reviewers": [
+        "Bart Van Assche <bvanassche@acm.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CLANG CONTROL FLOW INTEGRITY SUPPORT",
+      "maintainers": [
+        "Sami Tolvanen <samitolvanen@google.com>",
+        "Kees Cook <kees@kernel.org>"
+      ],
+      "reviewers": [
+        "Nathan Chancellor <nathan@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "CLANG/LLVM BUILD SUPPORT",
+      "maintainers": [
+        "Nathan Chancellor <nathan@kernel.org>"
+      ],
+      "reviewers": [
+        "Nick Desaulniers <nick.desaulniers+lkml@gmail.com>",
+        "Bill Wendling <morbo@google.com>",
+        "Justin Stitt <justinstitt@google.com>"
+      ],
+      "status": "Supported"
+    }
+  ],
+  "linux-block@vger.kernel.org": [
+    {
+      "subsystem": "BFQ I/O SCHEDULER",
+      "maintainers": [
+        "Yu Kuai <yukuai@fnnas.com>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "BLOCK LAYER",
+      "maintainers": [
+        "Jens Axboe <axboe@kernel.dk>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BLOCK LAYER DEVICE DRIVER API [RUST]",
+      "maintainers": [
+        "Andreas Hindborg <a.hindborg@kernel.org>"
+      ],
+      "reviewers": [
+        "Boqun Feng <boqun@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "CONTROL GROUP - BLOCK IO CONTROLLER (BLKIO)",
+      "maintainers": [
+        "Tejun Heo <tj@kernel.org>",
+        "Josef Bacik <josef@toxicpanda.com>",
+        "Jens Axboe <axboe@kernel.dk>"
+      ],
+      "reviewers": [],
+      "status": ""
+    },
+    {
+      "subsystem": "FLOPPY DRIVER",
+      "maintainers": [
+        "Denis Efremov <efremov@linux.com>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "NETWORK BLOCK DEVICE (NBD)",
+      "maintainers": [
+        "Josef Bacik <josef@toxicpanda.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RNBD BLOCK DRIVERS",
+      "maintainers": [
+        "Md. Haris Iqbal <haris.iqbal@ionos.com>",
+        "Jack Wang <jinpu.wang@ionos.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SECURE ENCRYPTING DEVICE (SED) OPAL DRIVER",
+      "maintainers": [
+        "Jonathan Derrick <jonathan.derrick@linux.dev>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "UBLK USERSPACE BLOCK DRIVER",
+      "maintainers": [
+        "Ming Lei <ming.lei@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "USERSPACE COPYIN/COPYOUT (UIOVEC)",
+      "maintainers": [
+        "Alexander Viro <viro@zeniv.linux.org.uk>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ZONED BLOCK DEVICE (BLOCK LAYER)",
+      "maintainers": [
+        "Damien Le Moal <dlemoal@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ZONED LOOP DEVICE",
+      "maintainers": [
+        "Damien Le Moal <dlemoal@kernel.org>"
+      ],
+      "reviewers": [
+        "Christoph Hellwig <hch@lst.de>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "v9fs@lists.linux.dev": [
+    {
+      "subsystem": "9P FILE SYSTEM",
+      "maintainers": [
+        "Eric Van Hensbergen <ericvh@kernel.org>",
+        "Latchesar Ionkov <lucho@ionkov.net>",
+        "Dominique Martinet <asmadeus@codewreck.org>"
+      ],
+      "reviewers": [
+        "Christian Schoenebeck <linux_oss@crudebyte.com>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "linux-nfs@vger.kernel.org": [
+    {
+      "subsystem": "FILESYSTEMS [EXPORTFS]",
+      "maintainers": [
+        "Chuck Lever <chuck.lever@oracle.com>",
+        "Jeff Layton <jlayton@kernel.org>"
+      ],
+      "reviewers": [
+        "Amir Goldstein <amir73il@gmail.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "KERNEL NFSD, SUNRPC, AND LOCKD SERVERS",
+      "maintainers": [
+        "Chuck Lever <chuck.lever@oracle.com>",
+        "Jeff Layton <jlayton@kernel.org>"
+      ],
+      "reviewers": [
+        "NeilBrown <neil@brown.name>",
+        "Olga Kornievskaia <okorniev@redhat.com>",
+        "Dai Ngo <Dai.Ngo@oracle.com>",
+        "Tom Talpey <tom@talpey.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "NFS, SUNRPC, AND LOCKD CLIENTS",
+      "maintainers": [
+        "Trond Myklebust <trondmy@kernel.org>",
+        "Anna Schumaker <anna@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    }
+  ],
+  "linux-fsdevel@vger.kernel.org": [
+    {
+      "subsystem": "AFFS FILE SYSTEM",
+      "maintainers": [
+        "David Sterba <dsterba@suse.com>"
+      ],
+      "reviewers": [],
+      "status": "Odd Fixes"
+    },
+    {
+      "subsystem": "DIRECTORY NOTIFICATION (DNOTIFY)",
+      "maintainers": [
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "reviewers": [
+        "Amir Goldstein <amir73il@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "EXFAT FILE SYSTEM",
+      "maintainers": [
+        "Namjae Jeon <linkinjeon@kernel.org>",
+        "Sungjong Seo <sj1557.seo@samsung.com>"
+      ],
+      "reviewers": [
+        "Yuezhang Mo <yuezhang.mo@sony.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FANOTIFY",
+      "maintainers": [
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "reviewers": [
+        "Amir Goldstein <amir73il@gmail.com>",
+        "Matthew Bobrowski <repnop@google.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FILE LOCKING (flock() and fcntl()/lockf())",
+      "maintainers": [
+        "Jeff Layton <jlayton@kernel.org>",
+        "Chuck Lever <chuck.lever@oracle.com>"
+      ],
+      "reviewers": [
+        "Alexander Aring <alex.aring@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FILESYSTEM DIRECT ACCESS (DAX)",
+      "maintainers": [
+        "Dan Williams <dan.j.williams@intel.com>"
+      ],
+      "reviewers": [
+        "Matthew Wilcox <willy@infradead.org>",
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "FILESYSTEMS (VFS and infrastructure)",
+      "maintainers": [
+        "Alexander Viro <viro@zeniv.linux.org.uk>",
+        "Christian Brauner <brauner@kernel.org>"
+      ],
+      "reviewers": [
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FILESYSTEMS [EXPORTFS]",
+      "maintainers": [
+        "Chuck Lever <chuck.lever@oracle.com>",
+        "Jeff Layton <jlayton@kernel.org>"
+      ],
+      "reviewers": [
+        "Amir Goldstein <amir73il@gmail.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "FILESYSTEMS [IDMAPPED MOUNTS]",
+      "maintainers": [
+        "Christian Brauner <brauner@kernel.org>",
+        "Seth Forshee <sforshee@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FILESYSTEMS [IOMAP]",
+      "maintainers": [
+        "Christian Brauner <brauner@kernel.org>"
+      ],
+      "reviewers": [
+        "Darrick J. Wong <djwong@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "FILESYSTEMS [NETFS LIBRARY]",
+      "maintainers": [
+        "David Howells <dhowells@redhat.com>",
+        "Paulo Alcantara <pc@manguebit.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "FILESYSTEMS [STACKABLE]",
+      "maintainers": [
+        "Miklos Szeredi <miklos@szeredi.hu>",
+        "Amir Goldstein <amir73il@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FSNOTIFY: FILESYSTEM NOTIFICATION INFRASTRUCTURE",
+      "maintainers": [
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "reviewers": [
+        "Amir Goldstein <amir73il@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FUSE: FILESYSTEM IN USERSPACE",
+      "maintainers": [
+        "Miklos Szeredi <miklos@szeredi.hu>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HFS FILESYSTEM",
+      "maintainers": [
+        "Viacheslav Dubeyko <slava@dubeyko.com>",
+        "John Paul Adrian Glaubitz <glaubitz@physik.fu-berlin.de>",
+        "Yangtao Li <frank.li@vivo.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "HFSPLUS FILESYSTEM",
+      "maintainers": [
+        "Viacheslav Dubeyko <slava@dubeyko.com>",
+        "John Paul Adrian Glaubitz <glaubitz@physik.fu-berlin.de>",
+        "Yangtao Li <frank.li@vivo.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "INOTIFY",
+      "maintainers": [
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "reviewers": [
+        "Amir Goldstein <amir73il@gmail.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ISOFS FILESYSTEM",
+      "maintainers": [
+        "Jan Kara <jack@suse.cz>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PAGE CACHE",
+      "maintainers": [
+        "Matthew Wilcox (Oracle) <willy@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "PROC FILESYSTEM",
+      "maintainers": [],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PROC SYSCTL",
+      "maintainers": [
+        "Kees Cook <kees@kernel.org>",
+        "Joel Granados <joel.granados@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "UNICODE SUBSYSTEM",
+      "maintainers": [
+        "Gabriel Krisman Bertazi <krisman@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "USERSPACE COPYIN/COPYOUT (UIOVEC)",
+      "maintainers": [
+        "Alexander Viro <viro@zeniv.linux.org.uk>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "VIRTIO FILE SYSTEM",
+      "maintainers": [
+        "German Maglione <gmaglione@redhat.com>",
+        "Vivek Goyal <vgoyal@redhat.com>",
+        "Stefan Hajnoczi <stefanha@redhat.com>",
+        "Miklos Szeredi <miklos@szeredi.hu>"
+      ],
+      "reviewers": [
+        "Eugenio Pérez <eperezma@redhat.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "VIRTUAL BOX SHARED FOLDER VFS DRIVER",
+      "maintainers": [
+        "Hans de Goede <hansg@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "XARRAY",
+      "maintainers": [
+        "Matthew Wilcox <willy@infradead.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ZONEFS FILESYSTEM",
+      "maintainers": [
+        "Damien Le Moal <dlemoal@kernel.org>",
+        "Naohiro Aota <naohiro.aota@wdc.com>"
+      ],
+      "reviewers": [
+        "Johannes Thumshirn <jth@kernel.org>"
+      ],
+      "status": "Maintained"
+    }
+  ],
+  "linux-pm@vger.kernel.org": [
+    {
+      "subsystem": "ALLWINNER CPUFREQ DRIVER",
+      "maintainers": [
+        "Yangtao Li <tiny.windzz@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ALLWINNER THERMAL DRIVER",
+      "maintainers": [
+        "Vasily Khoruzhick <anarsoul@gmail.com>",
+        "Yangtao Li <tiny.windzz@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "AMD PSTATE DRIVER",
+      "maintainers": [
+        "Huang Rui <ray.huang@amd.com>",
+        "Gautham R. Shenoy <gautham.shenoy@amd.com>",
+        "Mario Limonciello <mario.limonciello@amd.com>"
+      ],
+      "reviewers": [
+        "Perry Yuan <perry.yuan@amd.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ANALOG DEVICES INC ADP5061 DRIVER",
+      "maintainers": [
+        "Michael Hennerich <Michael.Hennerich@analog.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "BROADCOM BMIPS CPUFREQ DRIVER",
+      "maintainers": [
+        "Markus Mayer <mmayer@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM PMB (POWER MANAGEMENT BUS) DRIVER",
+      "maintainers": [
+        "Rafał Miłecki <rafal@milecki.pl>",
+        "Florian Fainelli <florian.fainelli@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM STB AVS CPUFREQ DRIVER",
+      "maintainers": [
+        "Markus Mayer <mmayer@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BROADCOM STB AVS TMON DRIVER",
+      "maintainers": [
+        "Markus Mayer <mmayer@broadcom.com>"
+      ],
+      "reviewers": [
+        "Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS",
+      "maintainers": [
+        "Chanwoo Choi <cw00.choi@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPU FREQUENCY DRIVERS - VEXPRESS SPC ARM BIG LITTLE",
+      "maintainers": [
+        "Viresh Kumar <viresh.kumar@linaro.org>",
+        "Sudeep Holla <sudeep.holla@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPU FREQUENCY SCALING FRAMEWORK",
+      "maintainers": [
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>",
+        "Viresh Kumar <viresh.kumar@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPU FREQUENCY DRIVERS - VIRTUAL MACHINE CPUFREQ",
+      "maintainers": [
+        "Saravana Kannan <saravanak@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPU IDLE TIME MANAGEMENT FRAMEWORK",
+      "maintainers": [
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>",
+        "Daniel Lezcano <daniel.lezcano@kernel.org>"
+      ],
+      "reviewers": [
+        "Christian Loehle <christian.loehle@arm.com>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPU POWER MONITORING SUBSYSTEM",
+      "maintainers": [
+        "Thomas Renninger <trenn@suse.com>",
+        "Shuah Khan <shuah@kernel.org>",
+        "Shuah Khan <skhan@linuxfoundation.org>",
+        "John B. Wyatt IV <jwyatt@redhat.com>",
+        "John B. Wyatt IV <sageofredondo@gmail.com>",
+        "John Kacur <jkacur@redhat.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPUIDLE DRIVER - ARM BIG LITTLE",
+      "maintainers": [
+        "Lorenzo Pieralisi <lpieralisi@kernel.org>",
+        "Daniel Lezcano <daniel.lezcano@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPUIDLE DRIVER - ARM EXYNOS",
+      "maintainers": [
+        "Daniel Lezcano <daniel.lezcano@kernel.org>",
+        "Kukjin Kim <kgene@kernel.org>"
+      ],
+      "reviewers": [
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "CPUIDLE DRIVER - ARM PSCI",
+      "maintainers": [
+        "Lorenzo Pieralisi <lpieralisi@kernel.org>",
+        "Sudeep Holla <sudeep.holla@kernel.org>",
+        "Ulf Hansson <ulf.hansson@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "CPUIDLE DRIVER - ARM PSCI PM DOMAIN",
+      "maintainers": [
+        "Ulf Hansson <ulf.hansson@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "CPUIDLE DRIVER - DT IDLE PM DOMAIN",
+      "maintainers": [
+        "Ulf Hansson <ulf.hansson@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "CPUIDLE DRIVER - RISC-V SBI",
+      "maintainers": [
+        "Anup Patel <anup@brainfault.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DEVICE FREQUENCY (DEVFREQ)",
+      "maintainers": [
+        "MyungJoo Ham <myungjoo.ham@samsung.com>",
+        "Kyungmin Park <kyungmin.park@samsung.com>",
+        "Chanwoo Choi <cw00.choi@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DEVICE FREQUENCY EVENT (DEVFREQ-EVENT)",
+      "maintainers": [
+        "Chanwoo Choi <cw00.choi@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "DMC FREQUENCY DRIVER FOR SAMSUNG EXYNOS5422",
+      "maintainers": [
+        "Lukasz Luba <lukasz.luba@arm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DRIVERS FOR OMAP ADAPTIVE VOLTAGE SCALING (AVS)",
+      "maintainers": [
+        "Nishanth Menon <nm@ti.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "DYNAMIC THERMAL POWER MANAGEMENT (DTPM)",
+      "maintainers": [
+        "Daniel Lezcano <daniel.lezcano@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "ENERGY MODEL",
+      "maintainers": [
+        "Lukasz Luba <lukasz.luba@arm.com>",
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "FREEZER",
+      "maintainers": [
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>"
+      ],
+      "reviewers": [
+        "Pavel Machek <pavel@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "GENERIC PM DOMAINS",
+      "maintainers": [
+        "Ulf Hansson <ulf.hansson@linaro.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "HIBERNATION (aka Software Suspend, aka swsusp)",
+      "maintainers": [
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>"
+      ],
+      "reviewers": [
+        "Pavel Machek <pavel@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "INTEL IDLE DRIVER",
+      "maintainers": [
+        "Rafael J. Wysocki <rafael@kernel.org>",
+        "Artem Bityutskiy <artem.bityutskiy@linux.intel.com>",
+        "Artem Bityutskiy <dedekind1@gmail.com>"
+      ],
+      "reviewers": [
+        "Len Brown <lenb@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "INTEL PSTATE DRIVER",
+      "maintainers": [
+        "Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>",
+        "Len Brown <lenb@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "INTERCONNECT API",
+      "maintainers": [
+        "Georgi Djakov <djakov@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LOONGSON-2 SOC SERIES PM DRIVER",
+      "maintainers": [
+        "Yinbo Zhu <zhuyinbo@loongson.cn>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "LOONGSON-2 SOC SERIES THERMAL DRIVER",
+      "maintainers": [
+        "zhanghongchen <zhanghongchen@loongson.cn>",
+        "Yinbo Zhu <zhuyinbo@loongson.cn>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MAX17040 FAMILY FUEL GAUGE DRIVERS",
+      "maintainers": [],
+      "reviewers": [
+        "Iskren Chernev <iskren.chernev@gmail.com>",
+        "Krzysztof Kozlowski <krzk@kernel.org>",
+        "Marek Szyprowski <m.szyprowski@samsung.com>",
+        "Matheus Castello <matheus@castello.eng.br>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MAX17042 FAMILY FUEL GAUGE DRIVERS",
+      "maintainers": [],
+      "reviewers": [
+        "Hans de Goede <hansg@kernel.org>",
+        "Krzysztof Kozlowski <krzk@kernel.org>",
+        "Marek Szyprowski <m.szyprowski@samsung.com>",
+        "Sebastian Krzyszkowiak <sebastian.krzyszkowiak@puri.sm>",
+        "Purism Kernel Team <kernel@puri.sm>"
+      ],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MAXIM MUIC CHARGER DRIVERS FOR EXYNOS BASED BOARDS",
+      "maintainers": [
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEDIATEK BOARD LEVEL SHUTDOWN DRIVERS",
+      "maintainers": [
+        "Sen Chu <sen.chu@mediatek.com>",
+        "Sean Wang <sean.wang@mediatek.com>",
+        "Macpaul Lin <macpaul.lin@mediatek.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MEMORY FREQUENCY SCALING DRIVERS FOR NVIDIA TEGRA",
+      "maintainers": [
+        "Dmitry Osipenko <digetx@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "MICROSOFT SURFACE BATTERY AND AC DRIVERS",
+      "maintainers": [
+        "Maximilian Luz <luzmaximilian@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "OPERATING PERFORMANCE POINTS (OPP)",
+      "maintainers": [
+        "Viresh Kumar <vireshk@kernel.org>",
+        "Nishanth Menon <nm@ti.com>",
+        "Stephen Boyd <sboyd@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "PM-GRAPH UTILITY",
+      "maintainers": [
+        "\"Todd E Brandt\" <todd.e.brandt@linux.intel.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "POWER MANAGEMENT CORE",
+      "maintainers": [
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "POWER SEQUENCING",
+      "maintainers": [
+        "Bartosz Golaszewski <brgl@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "POWER SUPPLY CLASS/SUBSYSTEM and DRIVERS",
+      "maintainers": [
+        "Sebastian Reichel <sre@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM CORE POWER REDUCTION (CPR) AVS DRIVER",
+      "maintainers": [
+        "Bjorn Andersson <andersson@kernel.org>",
+        "Konrad Dybcio <konradybcio@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM CPUFREQ DRIVER MSM8996/APQ8096",
+      "maintainers": [
+        "Ilia Lin <ilia.lin@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "QUALCOMM TSENS THERMAL DRIVER",
+      "maintainers": [
+        "Amit Kucheria <amitk@kernel.org>",
+        "Thara Gopinath <thara.gopinath@gmail.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS RZ/G3E THERMAL SENSOR UNIT DRIVER",
+      "maintainers": [
+        "John Madieu <john.madieu.xa@bp.renesas.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "RENESAS RZ/G3S THERMAL SENSOR UNIT DRIVER",
+      "maintainers": [
+        "Claudiu Beznea <claudiu.beznea.uj@bp.renesas.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SAMSUNG INTERCONNECT DRIVERS",
+      "maintainers": [
+        "Sylwester Nawrocki <s.nawrocki@samsung.com>",
+        "Artur Świgoń <a.swigon@samsung.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SAMSUNG THERMAL DRIVER",
+      "maintainers": [
+        "Bartlomiej Zolnierkiewicz <bzolnier@gmail.com>",
+        "Krzysztof Kozlowski <krzk@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "ST STC3117 FUEL GAUGE DRIVER",
+      "maintainers": [
+        "Hardevsinh Palaniya <hardevsinh.palaniya@siliconsignals.io>",
+        "Bhavin Sharma <bhavin.sharma@siliconsignals.io>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "SUSPEND TO RAM",
+      "maintainers": [
+        "\"Rafael J. Wysocki\" <rafael@kernel.org>"
+      ],
+      "reviewers": [
+        "Len Brown <lenb@kernel.org>",
+        "Pavel Machek <pavel@kernel.org>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "SYSTEM RESET/SHUTDOWN DRIVERS",
+      "maintainers": [
+        "Sebastian Reichel <sre@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "THERMAL",
+      "maintainers": [
+        "Rafael J. Wysocki <rafael@kernel.org>",
+        "Daniel Lezcano <daniel.lezcano@kernel.org>"
+      ],
+      "reviewers": [
+        "Zhang Rui <rui.zhang@intel.com>",
+        "Lukasz Luba <lukasz.luba@arm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "THERMAL DRIVER FOR AMLOGIC SOCS",
+      "maintainers": [
+        "Guillaume La Roque <glaroque@baylibre.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "THERMAL/CPU_COOLING",
+      "maintainers": [
+        "Amit Daniel Kachhap <amit.kachhap@gmail.com>",
+        "Daniel Lezcano <daniel.lezcano@kernel.org>",
+        "Viresh Kumar <viresh.kumar@linaro.org>"
+      ],
+      "reviewers": [
+        "Lukasz Luba <lukasz.luba@arm.com>"
+      ],
+      "status": "Supported"
+    },
+    {
+      "subsystem": "THERMAL/POWER_ALLOCATOR",
+      "maintainers": [
+        "Lukasz Luba <lukasz.luba@arm.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TI BANDGAP AND THERMAL DRIVER",
+      "maintainers": [
+        "Eduardo Valentin <edubezval@gmail.com>",
+        "Keerthy <j-keerthy@ti.com>"
+      ],
+      "reviewers": [],
+      "status": "Maintained"
+    },
+    {
+      "subsystem": "TURBOSTAT UTILITY",
+      "maintainers": [
+        "\"Len Brown\" <lenb@kernel.org>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    }
+  ],
+  "ntfs3@lists.linux.dev": [
+    {
+      "subsystem": "NTFS3 FILESYSTEM",
+      "maintainers": [
+        "Konstantin Komarov <almaz.alexandrovich@paragon-software.com>"
+      ],
+      "reviewers": [],
+      "status": "Supported"
+    }
+  ]
+}

@@ -90,10 +90,14 @@ from models import (
     Developer, DeveloperReport, LLMAnalysis, ReviewComment, Sentiment,
 )
 import mailing_list_tracker as mlt
+import maintainer_lookup
 from report_generator import extract_reviews_data, generate_html_report, message_id_to_slug
 from thread_analyzer import analyze_thread, filter_subtree_messages
 
 logger = logging.getLogger(__name__)
+
+# Loaded once at startup; supports both email and name-based maintainer matching.
+_MAINTAINER_LOOKUP: "maintainer_lookup.MaintainerLookup" = maintainer_lookup.load()
 
 
 def parse_args() -> argparse.Namespace:
@@ -630,6 +634,8 @@ def process_developer(
             else:
                 item.conversation = analyze_thread(thread_messages, item)
 
+            maintainer_lookup.mark_maintainers(item, _MAINTAINER_LOOKUP)
+
     return report
 
 
@@ -661,6 +667,7 @@ def _serialize_daily_report(
                     "message_date": rc.message_date,
                     "message_id": rc.message_id,
                     "analysis_source": rc.analysis_source,
+                    "email": rc.email,
                 })
         return {
             "activity_type": item.activity_type.value,
@@ -732,6 +739,7 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
                 message_date=rc.get("message_date", ""),
                 message_id=rc.get("message_id", ""),
                 analysis_source=rc.get("analysis_source", "heuristic"),
+                email=rc.get("email", ""),
             ))
 
         conv = ConversationSummary(
@@ -755,6 +763,7 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
         )
         # Recursively deserialize individual patches in a series.
         item.series_items = [_load_item(si) for si in d.get("series_items", [])]
+        maintainer_lookup.mark_maintainers(item, _MAINTAINER_LOOKUP)
         return item
 
     report = DailyReport(

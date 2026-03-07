@@ -57,6 +57,8 @@ class ReviewComment:
     reply_to: str = ""                  # Short name of who this comment is replying to (if known)
     message_date: str = ""              # YYYY-MM-DD of earliest message from this reviewer
     message_id: str = ""                # Message-ID (no angle brackets) for lore.kernel.org link
+    email: str = ""                     # reviewer's email address (lowercase)
+    is_maintainer: bool = False         # True if reviewer is a subsystem maintainer for this list
 
 
 @dataclass

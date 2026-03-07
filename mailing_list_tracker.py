@@ -41,6 +41,7 @@ VGER_DOMAIN = "vger.kernel.org"   # kept for reference / backward compat
 TRACKED_DOMAINS: frozenset[str] = frozenset({
     "vger.kernel.org",    # classic kernel mailing lists
     "lists.linux.dev",    # Linux Foundation mailing lists (modern)
+    "kvack.org",          # memory management (linux-mm)
 })
 
 _EMPTY_STATE: dict = {
