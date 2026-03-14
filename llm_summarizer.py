@@ -2209,6 +2209,7 @@ def analyze_thread_llm(
     dump_dir: Optional[Path] = None,
     force_monolithic: bool = False,
     thread_root_id: str = "",
+    skip_full_cache: bool = False,
 ) -> ConversationSummary:
     """Analyze a thread using an LLM backend with heuristic fallback.
 
@@ -2221,6 +2222,11 @@ def analyze_thread_llm(
             Parse failures are always dumped with an _ERROR suffix.
         force_monolithic: If True, skip per-reviewer decomposition and use
             the monolithic prompt even for Ollama on large threads.
+        skip_full_cache: If True, bypass the full-thread cache lookup and go
+            directly to per-reviewer mode.  Use for ongoing patches so that
+            new reviewers (not present when the thread was first cached) get
+            analyzed fresh while previously-cached reviewer entries are still
+            served from their per-message cache keys.
 
     Returns:
         ConversationSummary with all analysis fields populated.
@@ -2269,15 +2275,24 @@ def analyze_thread_llm(
     # Check cache first — key includes backend+model so different LLMs
     # don't share cached results.  Use canonical_id (thread root) so all
     # activity items from the same thread hit the same cache entry.
+    # skip_full_cache=True bypasses this for ongoing patches so that new
+    # reviewers (not present at first analysis) are picked up via per-reviewer
+    # mode (which uses per-message-id cache keys and handles new messages
+    # correctly).
     cache_key = _compute_cache_key(canonical_id, thread_messages, backend)
     msg_date = _message_date_for_cache(activity_item, thread_messages)
-    if cache:
+    if cache and not skip_full_cache:
         cached = cache.get(cache_key, msg_date)
         if cached is not None:
             logger.debug("LLM cache hit for %s", activity_item.message_id)
             participant_count = _count_participants_simple(thread_messages)
             return _build_conversation_summary(cached, participant_count, thread_messages)
         logger.info("Cache miss: %s", cache_key)
+    elif skip_full_cache:
+        logger.debug(
+            "Full-thread cache bypassed for ongoing patch %s — using per-reviewer mode",
+            activity_item.message_id,
+        )
 
     # --- Per-reviewer decomposition for Ollama on large threads ---
     if _should_use_per_reviewer_mode(backend, thread_messages, force_monolithic):

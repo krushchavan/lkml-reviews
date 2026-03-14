@@ -622,6 +622,7 @@ def process_developer(
                         dump_dir=llm_dump_dir,
                         force_monolithic=force_monolithic,
                         thread_root_id=effective_cache_id,
+                        skip_full_cache=item.is_ongoing,
                     )
                     item.llm_analyses.append(LLMAnalysis(
                         backend=backend_name,

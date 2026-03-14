@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-03-06T19:55:49Z",
+  "last_updated": "2026-03-13T14:52:43Z",
   "lists": {
     "linux-mm@kvack.org": {
       "address": "linux-mm@kvack.org",
@@ -13,8 +13,8 @@
       "address": "linux-nfs@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-04",
-      "last_seen": "2026-03-05",
-      "contribution_count": 43
+      "last_seen": "2026-03-12",
+      "contribution_count": 47
     },
     "linux-fsdevel@vger.kernel.org": {
       "address": "linux-fsdevel@vger.kernel.org",
@@ -34,8 +34,8 @@
       "address": "linux-kernel@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-18",
-      "last_seen": "2026-03-05",
-      "contribution_count": 233
+      "last_seen": "2026-03-12",
+      "contribution_count": 312
     },
     "linux-btrfs@vger.kernel.org": {
       "address": "linux-btrfs@vger.kernel.org",
@@ -48,8 +48,8 @@
       "address": "linux-cxl@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-11",
-      "last_seen": "2026-03-05",
-      "contribution_count": 146
+      "last_seen": "2026-03-12",
+      "contribution_count": 152
     },
     "linux-efi@vger.kernel.org": {
       "address": "linux-efi@vger.kernel.org",
@@ -76,8 +76,8 @@
       "address": "linux-trace-kernel@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-23",
-      "last_seen": "2026-03-04",
-      "contribution_count": 20
+      "last_seen": "2026-03-12",
+      "contribution_count": 30
     },
     "cgroups@vger.kernel.org": {
       "address": "cgroups@vger.kernel.org",
@@ -104,8 +104,8 @@
       "address": "bpf@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-26",
-      "last_seen": "2026-03-02",
-      "contribution_count": 8
+      "last_seen": "2026-03-11",
+      "contribution_count": 11
     },
     "linux-s390@vger.kernel.org": {
       "address": "linux-s390@vger.kernel.org",
@@ -118,8 +118,8 @@
       "address": "netdev@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-28",
-      "last_seen": "2026-03-03",
-      "contribution_count": 14
+      "last_seen": "2026-03-11",
+      "contribution_count": 15
     },
     "kvm@vger.kernel.org": {
       "address": "kvm@vger.kernel.org",

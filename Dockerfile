@@ -30,6 +30,8 @@ COPY report_generator.py .
 COPY build_index.py .
 COPY build_reviews.py .
 COPY clean_reports.py .
+COPY mailing_list_tracker.py .
+COPY maintainer_lookup.py .
 COPY kernel_developers_emails_1.csv .
 
 # Copy entrypoint script and fix Windows line endings

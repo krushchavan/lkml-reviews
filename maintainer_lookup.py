@@ -91,20 +91,27 @@ class MaintainerLookup:
     def is_maintainer(self, list_id: str, email: str, author: str) -> bool:
         """Return True if the reviewer is a subsystem maintainer.
 
-        When list_id is known, matches against that list's maintainer set.
-        When list_id is empty (old JSON reports), falls back to a global
-        check across all tracked lists.
+        When list_id is known, matches against that list's maintainer set
+        first.  If not found there, falls back to the global set so that
+        maintainers of related subsystems (e.g. david@kernel.org indexed under
+        linux-mm@kvack.org but reviewing a thread fetched via linux-kernel@
+        vger.kernel.org) are still recognised.
+        When list_id is empty (old JSON reports), only the global set is used.
         """
         norm = _normalise_author(author)
         if list_id:
             emails = self.by_email.get(list_id, frozenset())
             names = self.by_name.get(list_id, frozenset())
-        else:
-            emails = self._global_emails
-            names = self._global_names
-        if email and email in emails:
+            if email and email in emails:
+                return True
+            if norm and norm in names:
+                return True
+            # Fall back to global: catches maintainers whose subsystem list
+            # differs from the list_id captured from the lore.kernel.org thread
+            # (e.g. fetched from /all/ which returns linux-kernel as list_id).
+        if email and email in self._global_emails:
             return True
-        if norm and norm in names:
+        if norm and norm in self._global_names:
             return True
         return False
 

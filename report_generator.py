@@ -327,10 +327,27 @@ def _render_activity_item(
     # Submitted date (shown for all patches that have it, not just ongoing)
     if item.submitted_date:
         parts.append(f'<span class="submitted-date">Submitted {_esc(item.submitted_date)}</span>')
-    # Last comment date
+    # Last comment date — show eye-catching "TODAY" badge if activity is today,
+    # or a "No recent activity" warning for ongoing patches idle for 2+ days.
     last_comment = _last_comment_date(item)
     if last_comment:
-        parts.append(f'<span class="last-comment-date">Last comment {_esc(last_comment)}</span>')
+        if report_date and last_comment == report_date:
+            parts.append('<span class="today-badge">&#128293; TODAY</span>')
+        else:
+            parts.append(f'<span class="last-comment-date">Last comment {_esc(last_comment)}</span>')
+            # Flag stale ongoing patches: no activity for 2+ days
+            if item.is_ongoing and report_date and last_comment:
+                try:
+                    from datetime import date as _date
+                    d_report = _date.fromisoformat(report_date)
+                    d_last = _date.fromisoformat(last_comment)
+                    if (d_report - d_last).days >= 2:
+                        parts.append('<span class="stale-badge">&#9201; No recent activity</span>')
+                except ValueError:
+                    pass
+    elif item.is_ongoing:
+        # Ongoing patch with no comments at all is also stale
+        parts.append('<span class="stale-badge">&#9201; No comments yet</span>')
 
     # Title with link
     escaped_subject = _esc(item.subject)
@@ -766,6 +783,156 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
     return results
 
 
+def _is_contentious_item(item: ActivityItem) -> bool:
+    """Return True if the item has strong pushback or NAK signals."""
+    if not item.conversation:
+        return False
+    if item.conversation.sentiment == Sentiment.CONTENTIOUS:
+        return True
+    for rc in item.conversation.review_comments:
+        combined = " ".join(rc.sentiment_signals + rc.tags_given).lower()
+        if "nak" in combined or "nack" in combined:
+            return True
+        if rc.sentiment == Sentiment.CONTENTIOUS:
+            return True
+    return False
+
+
+def _render_daily_summary(
+    report: DailyReport,
+    review_links: Optional[dict[str, str]] = None,
+    report_date: str = "",
+) -> str:
+    """Render the top-level daily highlights summary for all engineers."""
+    # Collect all submitted patches and discussions across all tracked devs
+    all_items: list[tuple[str, ActivityItem]] = []
+    for dr in report.developer_reports:
+        for item in dr.patches_submitted + dr.discussions_posted:
+            all_items.append((dr.developer.name, item))
+
+    # 1. New patch series: submitted today (not ongoing), first version
+    new_series = [
+        (dev, item) for dev, item in all_items
+        if (item.activity_type == ActivityType.PATCH_SUBMITTED
+            and not item.is_ongoing
+            and item.patch_version == 1)
+    ]
+
+    # 2. Strong pushback / NAKs
+    pushed_back = [(dev, item) for dev, item in all_items if _is_contentious_item(item)]
+
+    # 3. High activity: top 5 items with at least 2 participants, sorted desc
+    def _participant_count(item: ActivityItem) -> int:
+        return item.conversation.participant_count if item.conversation else 0
+
+    high_activity = sorted(
+        [(dev, item) for dev, item in all_items if _participant_count(item) >= 2],
+        key=lambda x: _participant_count(x[1]),
+        reverse=True,
+    )[:5]
+
+    # 4. Maintainer involvement
+    def _maintainer_rcs(item: ActivityItem) -> list[ReviewComment]:
+        if not item.conversation:
+            return []
+        return [rc for rc in item.conversation.review_comments if rc.is_maintainer]
+
+    maintainer_items = [(dev, item) for dev, item in all_items if _maintainer_rcs(item)]
+
+    # --- Rendering helpers ---
+
+    _SENTIMENT_ICONS = {
+        Sentiment.POSITIVE: "&#10003;",
+        Sentiment.NEEDS_WORK: "&#9888;",
+        Sentiment.CONTENTIOUS: "&#10007;",
+        Sentiment.NEUTRAL: "",
+    }
+
+    def _summary_item(dev_name: str, item: ActivityItem, extra_html: str = "") -> str:
+        anchor = _name_to_anchor(dev_name)
+        dev_link = f'<a href="#{anchor}" class="summary-dev-link">{_esc(dev_name)}</a>'
+        subject_html = (
+            f'<a href="{_esc(item.url)}" target="_blank" rel="noopener" '
+            f'class="item-link">{_esc(item.subject)}</a>'
+        )
+        badges = ""
+        if item.series_patch_count and item.series_patch_count > 1:
+            badges += f'<span class="patch-count">{item.series_patch_count} patches</span>'
+        if item.patch_version > 1:
+            badges += f'<span class="version-badge latest">v{item.patch_version}</span>'
+        if item.conversation:
+            badges += _sentiment_badge(item.conversation.sentiment)
+        meta = f'<div class="summary-item-meta">by {dev_link}{(" &mdash; " + extra_html) if extra_html else ""}</div>'
+        return f'<div class="summary-item">{subject_html}{badges}{meta}</div>'
+
+    def _sub_section(title: str, icon: str, items: list[tuple], css_class: str, extra_fn=None) -> str:
+        if not items:
+            empty_html = '<div class="summary-empty">None today</div>'
+            return (
+                f'<div class="summary-section {css_class}">'
+                f'<div class="summary-section-title">{icon} {_esc(title)}</div>'
+                + empty_html
+                + "</div>"
+            )
+        rows = []
+        for dev, item in items:
+            extra = extra_fn(item) if extra_fn else ""
+            rows.append(_summary_item(dev, item, extra))
+        count_badge = f'<span class="summary-count">{len(items)}</span>'
+        return (
+            f'<div class="summary-section {css_class}">'
+            f'<div class="summary-section-title">{icon} {_esc(title)} {count_badge}</div>'
+            + "".join(rows)
+            + "</div>"
+        )
+
+    def _nak_extra(item: ActivityItem) -> str:
+        if not item.conversation:
+            return ""
+        pushback = []
+        for rc in item.conversation.review_comments:
+            combined = " ".join(rc.sentiment_signals + rc.tags_given).lower()
+            if "nak" in combined or "nack" in combined or rc.sentiment == Sentiment.CONTENTIOUS:
+                pushback.append(_esc(rc.author))
+        if pushback:
+            return f'<span class="summary-pushback-names">Pushback: {", ".join(pushback)}</span>'
+        return ""
+
+    def _activity_extra(item: ActivityItem) -> str:
+        if not item.conversation:
+            return ""
+        n = item.conversation.participant_count
+        return f'<span class="summary-activity-count">{n} participants</span>'
+
+    def _maintainer_extra(item: ActivityItem) -> str:
+        rcs = _maintainer_rcs(item)
+        if not rcs:
+            return ""
+        seen: set[str] = set()
+        parts_m = []
+        for rc in rcs:
+            if rc.author in seen:
+                continue
+            seen.add(rc.author)
+            icon = _SENTIMENT_ICONS.get(rc.sentiment, "")
+            parts_m.append(f'{_esc(rc.author)}{(" " + icon) if icon else ""}')
+        return f'<span class="summary-maintainer-names">&#9733; {", ".join(parts_m)}</span>'
+
+    sections = "".join(filter(None, [
+        _sub_section("New Patch Series", "&#128196;", new_series, "summary-new"),
+        _sub_section("Strong Pushback / NAKs", "&#9940;", pushed_back, "summary-nak", _nak_extra),
+        _sub_section("High Activity", "&#128293;", high_activity, "summary-active", _activity_extra),
+        _sub_section("Maintainer Comments", "&#9733;", maintainer_items, "summary-maintainer", _maintainer_extra),
+    ]))
+
+    return (
+        '<div class="daily-summary">'
+        '<h3 class="daily-summary-title">&#9733; Today\'s Highlights</h3>'
+        f'<div class="summary-grid">{sections}</div>'
+        '</div>'
+    )
+
+
 def generate_html_report(
     daily_report: DailyReport,
     review_links: Optional[dict[str, str]] = None,
@@ -801,6 +968,7 @@ def generate_html_report(
     )
 
     stats_section = _render_statistics(daily_report)
+    summary_section = _render_daily_summary(daily_report, review_links=review_links, report_date=report_date)
 
     progress_html = ""
     refresh_script = ""
@@ -1406,6 +1574,31 @@ def generate_html_report(
             margin-right: 6px;
             color: #ccc;
         }}
+        .today-badge {{
+            display: inline-block;
+            background: linear-gradient(135deg, #ff6b35, #f7c948);
+            color: #fff;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border-radius: 8px;
+            padding: 1px 8px;
+            margin-right: 8px;
+            vertical-align: middle;
+            box-shadow: 0 1px 4px rgba(255,107,53,0.35);
+        }}
+        .stale-badge {{
+            display: inline-block;
+            background: #f8f0e0;
+            color: #a07830;
+            font-size: 0.72em;
+            font-weight: 600;
+            border-radius: 8px;
+            padding: 1px 8px;
+            margin-right: 8px;
+            vertical-align: middle;
+            border: 1px solid #e8d5b0;
+        }}
         .si-date {{
             font-size: 0.68em;
             color: #aaa;
@@ -1577,6 +1770,124 @@ def generate_html_report(
             font-size: 0.9em;
             min-width: 32px;
         }}
+        /* Daily summary / highlights */
+        .daily-summary {{
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 32px;
+        }}
+        .daily-summary-title {{
+            font-size: 1em;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }}
+        .summary-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }}
+        .summary-section {{
+            border-radius: 6px;
+            padding: 12px 14px;
+            border-left: 4px solid #ccc;
+            background: #fafafa;
+        }}
+        .summary-new {{
+            border-left-color: #2980b9;
+            background: #f0f7ff;
+        }}
+        .summary-nak {{
+            border-left-color: #c0392b;
+            background: #fff5f5;
+        }}
+        .summary-active {{
+            border-left-color: #e67e22;
+            background: #fff9f0;
+        }}
+        .summary-maintainer {{
+            border-left-color: #f39c12;
+            background: #fffbf0;
+        }}
+        .summary-section-title {{
+            font-size: 0.82em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #555;
+            margin-bottom: 10px;
+        }}
+        .summary-count {{
+            display: inline-block;
+            background: rgba(0,0,0,0.08);
+            border-radius: 8px;
+            padding: 0 6px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #555;
+            margin-left: 4px;
+        }}
+        .summary-item {{
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            font-size: 0.85em;
+            line-height: 1.5;
+        }}
+        .summary-item:last-child {{
+            border-bottom: none;
+            padding-bottom: 0;
+        }}
+        .summary-item-meta {{
+            font-size: 0.82em;
+            color: #888;
+            margin-top: 2px;
+        }}
+        .summary-dev-link {{
+            color: #2980b9;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .summary-dev-link:hover {{
+            text-decoration: underline;
+        }}
+        .summary-pushback-names {{
+            display: inline-block;
+            background: #fde8e8;
+            color: #a93226;
+            border-radius: 8px;
+            padding: 0 7px;
+            font-size: 0.88em;
+            font-weight: 500;
+        }}
+        .summary-activity-count {{
+            display: inline-block;
+            background: #fdebd0;
+            color: #935116;
+            border-radius: 8px;
+            padding: 0 7px;
+            font-size: 0.88em;
+            font-weight: 500;
+        }}
+        .summary-maintainer-names {{
+            display: inline-block;
+            background: #fef9e7;
+            color: #9a7d0a;
+            border-radius: 8px;
+            padding: 0 7px;
+            font-size: 0.88em;
+            font-weight: 500;
+            border: 1px solid #f9e79f;
+        }}
+        .summary-empty {{
+            color: #aaa;
+            font-style: italic;
+            font-size: 0.9em;
+            padding: 10px 4px;
+        }}
     </style>
 </head>
 <body>
@@ -1588,6 +1899,8 @@ def generate_html_report(
     {progress_html}
 
     {stats_section}
+
+    {summary_section}
 
     {developer_sections}
 
