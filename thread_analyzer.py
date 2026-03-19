@@ -895,7 +895,14 @@ def filter_subtree_messages(
         if not mid:
             continue
         by_id[mid] = msg
-        parent = msg.get("in_reply_to", "").strip("<>")
+        # Strip angle brackets and any surrounding whitespace.  Some parsed
+        # mbox headers look like "<msg-id> " or "<msg-id> (comment)" — a plain
+        # .strip("<>") leaves trailing "> " when a space follows the closing ">".
+        # Extract only the bare message-id: everything between the first "<" and
+        # the first ">", falling back to a simple strip.
+        _raw_irt = msg.get("in_reply_to", "")
+        _m = re.match(r"\s*<?\s*([^<>\s][^>]*?)\s*>", _raw_irt)
+        parent = _m.group(1).strip() if _m else _raw_irt.strip("<> \t\r\n")
         if parent:
             children_of.setdefault(parent, []).append(mid)
 

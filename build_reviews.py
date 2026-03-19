@@ -14,7 +14,16 @@ Usage:
 import argparse
 import html
 import json
+import sys
 from pathlib import Path
+
+# Optional maintainer lookup — used to back-fill is_maintainer on review
+# entries that predate the field (old JSON files) or come from older reports.
+try:
+    import maintainer_lookup as _ml
+    _MAINTAINER_LOOKUP = _ml.load()
+except Exception:
+    _MAINTAINER_LOOKUP = None
 
 
 _SENTIMENT_COLORS = {
@@ -149,6 +158,15 @@ def _merge_reviews_across_dates(dates: dict) -> tuple[list[dict], str]:
             entry["first_seen"] = date_str
             entry["report_file"] = report_file
 
+            # Back-fill is_maintainer for entries that predate the field.
+            # Explicit True always wins; missing/False gets a fresh lookup.
+            if not entry.get("is_maintainer") and _MAINTAINER_LOOKUP is not None:
+                entry["is_maintainer"] = _MAINTAINER_LOOKUP.is_maintainer(
+                    "",  # no list_id in review JSON → global lookup
+                    entry.get("email", ""),
+                    entry.get("author", ""),
+                )
+
             # Record the first new card for this date (for anchor placement)
             if first_idx_per_date[date_str] is None:
                 first_idx_per_date[date_str] = len(result)
@@ -245,7 +263,15 @@ def _render_node(node: dict, depth: int = 0) -> str:
 
     # Header row
     parts.append('<div class="review-comment-header">')
-    parts.append(f'<span class="review-author">{_esc(node.get("author", ""))}</span>')
+    author_str = _esc(node.get("author", ""))
+    if node.get("is_maintainer"):
+        parts.append(
+            f'<span class="review-author">'
+            f'<span class="maintainer-star" title="Subsystem maintainer">&#9733;</span>'
+            f' {author_str}</span>'
+        )
+    else:
+        parts.append(f'<span class="review-author">{author_str}</span>')
 
     # Date chip
     first_seen = node.get("first_seen", "")
@@ -494,6 +520,10 @@ def build_review_html(data: dict) -> str:
             font-weight: 700;
             color: #1a1a1a;
             font-size: 0.95em;
+        }}
+        .maintainer-star {{
+            color: #d4a017;
+            font-size: 0.9em;
         }}
 
         /* Date chip — links back to the daily report */

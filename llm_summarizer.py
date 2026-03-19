@@ -2248,6 +2248,7 @@ def analyze_thread_llm(
     # Non-patch single-participant threads also fall through to the per-reviewer
     # path — heuristic is only used when LLM actually fails.
     participant_count = _count_participants_simple(thread_messages)
+    llm_summary: Optional[str] = None  # may be set by the chunked-patch path below
     if participant_count <= 1:
         is_patch = activity_item.activity_type == ActivityType.PATCH_SUBMITTED
         if is_patch:
@@ -2280,9 +2281,14 @@ def analyze_thread_llm(
     # mode (which uses per-message-id cache keys and handles new messages
     # correctly).
     cache_key = _compute_cache_key(canonical_id, thread_messages, backend)
+    # Include thread length in assembled cache key so that when new replies
+    # arrive the stale assembled result is not returned.  Individual per-reviewer
+    # sub-entries (keyed by message_id via _compute_per_reviewer_cache_key) are
+    # stable and survive thread growth; only the assembled shortcut is length-bound.
+    assembled_cache_key = f"{cache_key}_n{len(thread_messages)}"
     msg_date = _message_date_for_cache(activity_item, thread_messages)
     if cache and not skip_full_cache:
-        cached = cache.get(cache_key, msg_date)
+        cached = cache.get(assembled_cache_key, msg_date)
         if cached is not None:
             logger.debug("LLM cache hit for %s", activity_item.message_id)
             participant_count = _count_participants_simple(thread_messages)
@@ -2293,6 +2299,33 @@ def analyze_thread_llm(
             "Full-thread cache bypassed for ongoing patch %s — using per-reviewer mode",
             activity_item.message_id,
         )
+
+    # No replies in the thread: skip all further LLM analysis to prevent the
+    # monolithic path from hallucinating reviewer names that appear in the patch
+    # body/changelog but have not actually posted a reply message.
+    if len(thread_messages) <= 1:
+        heuristic = analyze_thread(thread_messages, activity_item)
+        if llm_summary:
+            heuristic.patch_summary = llm_summary
+        heuristic.analysis_source = "llm-chunked-no-replies"
+        logger.debug(
+            "No replies for %s — skipping monolithic LLM, returning empty review_comments",
+            activity_item.message_id,
+        )
+        if cache:
+            assembled = {
+                "patch_summary": heuristic.patch_summary,
+                "overall_sentiment": heuristic.sentiment.value.upper(),
+                "overall_sentiment_signals": heuristic.sentiment_signals,
+                "discussion_progress": (
+                    heuristic.discussion_progress.value.upper()
+                    if heuristic.discussion_progress else ""
+                ),
+                "progress_detail": heuristic.progress_detail,
+                "review_comments": [],
+            }
+            cache.put(assembled_cache_key, assembled, msg_date)
+        return heuristic
 
     # --- Per-reviewer decomposition for Ollama on large threads ---
     if _should_use_per_reviewer_mode(backend, thread_messages, force_monolithic):
@@ -2328,11 +2361,13 @@ def analyze_thread_llm(
                             "raw_body": rc.raw_body,
                             "reply_to": rc.reply_to,
                             "message_date": rc.message_date,
+                            "message_id": rc.message_id,
+                            "email": rc.email,
                         }
                         for rc in summary.review_comments
                     ],
                 }
-                cache.put(cache_key, assembled, msg_date)
+                cache.put(assembled_cache_key, assembled, msg_date)
             return summary
         except Exception as e:
             logger.error(
@@ -2417,7 +2452,7 @@ def analyze_thread_llm(
 
         # Cache the merged+normalised result
         if cache:
-            cache.put(cache_key, parsed, msg_date)
+            cache.put(assembled_cache_key, parsed, msg_date)
 
         participant_count = _count_participants_simple(thread_messages)
         summary = _build_conversation_summary(parsed, participant_count, thread_messages)

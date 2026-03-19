@@ -767,6 +767,8 @@ def extract_reviews_data(daily_report: DailyReport, report_filename: str) -> lis
                     "reply_to": rc.reply_to,
                     "message_date": rc.message_date,
                     "message_id": getattr(rc, "message_id", "") or "",
+                    "email": getattr(rc, "email", "") or "",
+                    "is_maintainer": bool(getattr(rc, "is_maintainer", False)),
                 })
             results.append({
                 "message_id": effective_item.message_id,
