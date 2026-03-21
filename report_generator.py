@@ -401,26 +401,52 @@ def _render_activity_item(
             # generated for any prior day.
             si_slug = message_id_to_slug(si.message_id)
             si_href = _esc(f"reviews/{si_slug}.html")
-            reviewer_badge = ""
             si_dates_html = ""
+            si_badges_html = ""
+            si_contributors_html = ""
             if si.submitted_date:
-                si_dates_html += f'<span class="si-date">Submitted {_esc(si.submitted_date)}</span>'
+                if report_date and si.submitted_date == report_date:
+                    si_badges_html += '<span class="today-badge">&#128293; TODAY</span>'
+                else:
+                    si_dates_html += f'<span class="si-date">Submitted {_esc(si.submitted_date)}</span>'
             if si.conversation and si.conversation.review_comments:
-                n = len(si.conversation.review_comments)
-                reviewer_badge = (
-                    f' <span class="si-reviewers">'
-                    f'{n} reviewer{"s" if n != 1 else ""}</span>'
-                )
                 rc_dates = [rc.message_date for rc in si.conversation.review_comments if rc.message_date]
                 if rc_dates:
-                    si_dates_html += f'<span class="si-date">Last comment {_esc(max(rc_dates))}</span>'
+                    last_rc = max(rc_dates)
+                    if report_date and last_rc == report_date:
+                        si_badges_html += '<span class="today-badge">&#128293; TODAY</span>'
+                    else:
+                        si_dates_html += f'<span class="si-date">Last comment {_esc(last_rc)}</span>'
+                # Sentiment badge
+                si_badges_html += _sentiment_badge(si.conversation.sentiment)
+                # Discussion progress badge
+                if si.conversation.discussion_progress:
+                    si_badges_html += _progress_badge(si.conversation.discussion_progress)
+                # Contributor list: unique reviewer names with maintainer star
+                seen_contributors: set[str] = set()
+                contributor_parts = []
+                for rc in si.conversation.review_comments:
+                    if rc.author in seen_contributors:
+                        continue
+                    seen_contributors.add(rc.author)
+                    star = "&#9733;&nbsp;" if rc.is_maintainer else ""
+                    contributor_parts.append(
+                        f'<span class="si-contributor">{star}{_esc(rc.author)}</span>'
+                    )
+                if contributor_parts:
+                    si_contributors_html = (
+                        '<span class="si-contributors">'
+                        + " ".join(contributor_parts)
+                        + "</span>"
+                    )
             parts.append(
                 f'<li class="series-patch-item">'
                 f'<span class="si-num">[{_esc(str(num))}/{total}]</span> '
                 f'<a href="{si_href}" target="_blank" class="si-link">'
                 f'{_esc(clean_title)}</a>'
-                f'{reviewer_badge}'
+                f'{(" " + si_badges_html) if si_badges_html else ""}'
                 f'{(" " + si_dates_html) if si_dates_html else ""}'
+                f'{(" " + si_contributors_html) if si_contributors_html else ""}'
                 f'</li>'
             )
         parts.append('</ul>')
@@ -1310,14 +1336,20 @@ def generate_html_report(
         }}
         .si-link {{ color: #0366d6; text-decoration: none; }}
         .si-link:hover {{ text-decoration: underline; }}
-        .si-reviewers {{
+        .si-contributors {{
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }}
+        .si-contributor {{
             display: inline-block;
-            font-size: 0.8em;
+            font-size: 0.78em;
             background: #e8f4fd;
             color: #0366d6;
             border-radius: 8px;
-            padding: 0 6px;
-            margin-left: 4px;
+            padding: 1px 7px;
         }}
         .conversation-summary {{
             margin-top: 6px;
