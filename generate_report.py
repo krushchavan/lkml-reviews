@@ -88,10 +88,14 @@ from llm_summarizer import (
 from models import (
     ActivityItem, ActivityType, ConversationSummary, DailyReport,
     Developer, DeveloperReport, LLMAnalysis, ReviewComment, Sentiment,
+    WeeklyReport,
 )
 import mailing_list_tracker as mlt
 import maintainer_lookup
-from report_generator import extract_reviews_data, generate_html_report, message_id_to_slug
+from report_generator import (
+    extract_reviews_data, generate_html_report, generate_weekly_html_report,
+    message_id_to_slug,
+)
 from thread_analyzer import analyze_thread, filter_subtree_messages
 
 logger = logging.getLogger(__name__)
@@ -301,6 +305,16 @@ def parse_args() -> argparse.Namespace:
             "this string (case-insensitive partial match, e.g. '20260126065242'). "
             "Writes a standalone preview file (reports/preview_<slug>.html) without "
             "touching the full report or index."
+        ),
+    )
+
+    parser.add_argument(
+        "--weekly",
+        action="store_true",
+        help=(
+            "Force generate a weekly report for the Mon–Sun week that contains --date "
+            "(or yesterday). Weekly reports are also auto-generated when --date falls "
+            "on a Sunday. Requires daily JSON data to be present in <output-dir>/daily/."
         ),
     )
 
@@ -681,6 +695,7 @@ def _serialize_daily_report(
             "is_ongoing": item.is_ongoing,
             "submitted_date": item.submitted_date,
             "patch_version": item.patch_version,
+            "series_patch_count": item.series_patch_count,
             "version_history": item.version_history,
             "series_items": [_serialize_item(si) for si in item.series_items],
             "patch_summary": conv.patch_summary if conv else "",
@@ -759,6 +774,8 @@ def _load_daily_report(daily_json_path: Path) -> "DailyReport":
             ack_type=d.get("ack_type"),
             is_ongoing=d.get("is_ongoing", False),
             submitted_date=d.get("submitted_date"),
+            patch_version=d.get("patch_version", 1),
+            series_patch_count=d.get("series_patch_count"),
             conversation=conv,
             list_id=d.get("list_id", ""),
         )
@@ -968,7 +985,35 @@ def _write_review_jsons(
                         dates = {}
                 else:
                     dates = {}
-                dates[si_date] = date_entry
+
+                # Bucket reviews by their individual message_date (same logic as
+                # the main _write_review_jsons loop) so cards show the correct date
+                # chip rather than the patch submission date.
+                if si.conversation and si_rc_list:
+                    reviews_by_bucket: dict[str, list] = {}
+                    for rc_data in si_rc_list:
+                        bucket = rc_data.get("message_date") or si_date
+                        reviews_by_bucket.setdefault(bucket, []).append(rc_data)
+                    for bucket_date, bucket_reviews in reviews_by_bucket.items():
+                        bucket_entry: dict = {
+                            "report_file": report_filename,
+                            "developer": dr.developer.name,
+                            "reviews": bucket_reviews,
+                            "analysis_source": date_entry.get("analysis_source", "heuristic"),
+                        }
+                        if date_entry.get("patch_summary"):
+                            bucket_entry["patch_summary"] = date_entry["patch_summary"]
+                        dates[bucket_date] = bucket_entry
+                    # Ensure the submission-date entry always exists (may have no reviews)
+                    if si_date not in dates:
+                        dates[si_date] = {
+                            "report_file": report_filename,
+                            "developer": dr.developer.name,
+                            "reviews": [],
+                        }
+                else:
+                    dates[si_date] = date_entry
+
                 si_merged = {
                     "thread_id": si.message_id,
                     "subject": si.subject,
@@ -1716,6 +1761,212 @@ def rebuild_html_from_json(args: argparse.Namespace, target_dates: list) -> None
         logger.info("Index updated.")
 
 
+# ---------------------------------------------------------------------------
+# Weekly report generation
+# ---------------------------------------------------------------------------
+
+def _build_weekly_narrative(
+    weekly_report: WeeklyReport,
+    backends: "dict[str, LLMBackend]",
+    cache_dir: Path,
+) -> str:
+    """Generate a short LLM narrative summarising the week.
+
+    Caches the result in cache_dir/week-<iso_week>-narrative.txt so
+    subsequent runs (e.g. --rebuild-html) skip the LLM call.
+    Returns empty string if no backends are available.
+    """
+    if not backends:
+        return ""
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    # Include backend name in cache key so switching backends invalidates it
+    backend_name, backend = next(iter(backends.items()))
+    safe_model = backend.model.replace(":", "-").replace("/", "-")
+    cache_key = f"week-{weekly_report.iso_week}-{backend_name}-{safe_model}-narrative.txt"
+    cache_file = cache_dir / cache_key
+
+    if cache_file.exists():
+        logger.info("Weekly narrative: using cached result (%s)", cache_file.name)
+        return cache_file.read_text(encoding="utf-8").strip()
+
+    # --- Assemble prompt context from the weekly data ---
+    # Collect all items across the week
+    all_subjects: list[str] = []
+    subsystems: dict[str, int] = {}
+    nak_count = 0
+    maintainer_count = 0
+    top_threads: list[tuple[int, str]] = []
+
+    for dr in weekly_report.daily_reports:
+        for dev_report in dr.developer_reports:
+            for item in dev_report.patches_submitted + dev_report.discussions_posted:
+                all_subjects.append(item.subject)
+                # Extract subsystem from subject (text before first colon)
+                m = re.match(r"^\[.*?\]\s*([^:]+):", item.subject)
+                if not m:
+                    m = re.match(r"^([^:]+):", item.subject)
+                if m:
+                    subsys = m.group(1).strip().split("/")[0].lower()
+                    subsystems[subsys] = subsystems.get(subsys, 0) + 1
+
+                if item.conversation:
+                    cnt = item.conversation.participant_count
+                    if cnt >= 3:
+                        top_threads.append((cnt, item.subject))
+                    for rc in item.conversation.review_comments:
+                        combined = " ".join(rc.sentiment_signals + rc.tags_given).lower()
+                        if "nak" in combined or "nack" in combined:
+                            nak_count += 1
+                        if rc.is_maintainer:
+                            maintainer_count += 1
+
+    top_threads_sorted = sorted(top_threads, reverse=True)[:5]
+    top_subsystems = sorted(subsystems.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    context_lines = [
+        f"Week: {weekly_report.week_start} to {weekly_report.week_end} ({weekly_report.iso_week})",
+        f"Total new patches: {weekly_report.total_patches}",
+        f"Total reviews: {weekly_report.total_reviews}",
+        f"Total acks: {weekly_report.total_acks}",
+        f"Days with activity: {len(weekly_report.daily_reports)}",
+        f"NAK/pushback count: {nak_count}",
+        f"Maintainer comments: {maintainer_count}",
+        "",
+        "Top subsystems by patch count:",
+    ]
+    for subsys, count in top_subsystems:
+        context_lines.append(f"  - {subsys}: {count} patches")
+
+    if top_threads_sorted:
+        context_lines.append("")
+        context_lines.append("Most-discussed threads (participant count, subject):")
+        for cnt, subject in top_threads_sorted:
+            context_lines.append(f"  - [{cnt}p] {subject}")
+
+    context = "\n".join(context_lines)
+
+    prompt = (
+        "You are summarising a week of upstream Linux kernel development activity "
+        "for a team of engineers who contribute to the kernel. Write a concise "
+        "2–4 sentence narrative (plain text, no markdown, no bullet points) that "
+        "describes the main themes, notable threads, and overall tone of the week. "
+        "Focus on what matters to working kernel engineers.\n\n"
+        f"Weekly data:\n{context}\n\n"
+        "Weekly narrative:"
+    )
+
+    try:
+        narrative = backend.complete(prompt, max_tokens=300).strip()
+        cache_file.write_text(narrative, encoding="utf-8")
+        logger.info("Weekly narrative generated (%d chars)", len(narrative))
+        return narrative
+    except Exception as e:
+        logger.warning("Weekly narrative LLM call failed: %s", e)
+        return ""
+
+
+def generate_weekly_report(
+    args: argparse.Namespace,
+    reports_dir: Path,
+    week_dates: "list[datetime]",
+    llm_backends: "dict[str, LLMBackend]",
+) -> "Optional[Path]":
+    """Build and write a weekly HTML report from 7 daily DailyReport JSONs.
+
+    Args:
+        args:         Parsed CLI args (used for output_dir, llm settings).
+        reports_dir:  Base reports directory.
+        week_dates:   List of 7 datetime objects (Mon–Sun), oldest first.
+        llm_backends: Active LLM backends (may be empty for heuristic mode).
+
+    Returns:
+        Path to the written weekly HTML file, or None if insufficient data.
+    """
+    week_start = week_dates[0].strftime("%Y-%m-%d")
+    week_end   = week_dates[-1].strftime("%Y-%m-%d")
+    # ISO week: e.g. "2026-W15"
+    iso_week = week_dates[-1].strftime("%Y-W%V")
+
+    # Load each day's DailyReport; skip days with missing JSON gracefully
+    daily_dir = reports_dir / "daily"
+    loaded: list[DailyReport] = []
+    for d in week_dates:
+        json_path = daily_dir / f"{d.strftime('%Y-%m-%d')}.json"
+        if not json_path.exists():
+            logger.debug("Weekly report: no JSON for %s — skipping", d.strftime("%Y-%m-%d"))
+            continue
+        try:
+            loaded.append(_load_daily_report(json_path))
+        except Exception as e:
+            logger.warning("Weekly report: failed to load %s: %s", json_path.name, e)
+
+    if len(loaded) < 3:
+        logger.warning(
+            "Weekly report: only %d/%d days available (need ≥3) — skipping %s",
+            len(loaded), len(week_dates), iso_week,
+        )
+        return None
+
+    logger.info(
+        "Weekly report: aggregating %d days (%s – %s)",
+        len(loaded), week_start, week_end,
+    )
+
+    # Aggregate totals
+    total_patches = sum(dr.total_patches for dr in loaded)
+    total_reviews = sum(dr.total_reviews for dr in loaded)
+    total_acks    = sum(dr.total_acks    for dr in loaded)
+
+    # Collect unique LLM backends used across all days
+    seen_backends: set[tuple] = set()
+    all_backends: list[tuple[str, str]] = []
+    for dr in loaded:
+        for pair in dr.llm_backends:
+            if pair not in seen_backends:
+                seen_backends.add(pair)
+                all_backends.append(pair)
+    # Also add any backends active right now (for the narrative)
+    for name, backend in llm_backends.items():
+        pair = (name, backend.model)
+        if pair not in seen_backends:
+            seen_backends.add(pair)
+            all_backends.append(pair)
+
+    weekly_report = WeeklyReport(
+        week_start=week_start,
+        week_end=week_end,
+        iso_week=iso_week,
+        daily_reports=loaded,
+        llm_backends=all_backends,
+        total_patches=total_patches,
+        total_reviews=total_reviews,
+        total_acks=total_acks,
+    )
+
+    # Generate LLM narrative
+    cache_dir = reports_dir / "cache"
+    weekly_report.narrative = _build_weekly_narrative(weekly_report, llm_backends, cache_dir)
+
+    # Render HTML
+    html_content = generate_weekly_html_report(weekly_report, review_links=None)
+
+    # Output filename mirrors daily convention: week-YYYY-WNN[_backend_model].html
+    if llm_backends:
+        parts = [f"week-{iso_week}"]
+        for backend_name, backend in llm_backends.items():
+            safe_model = backend.model.replace(":", "-").replace("/", "-")
+            parts.append(f"{backend_name}_{safe_model}")
+        output_filename = "_".join(parts) + ".html"
+    else:
+        output_filename = f"week-{iso_week}.html"
+
+    output_path = reports_dir / output_filename
+    output_path.write_text(html_content, encoding="utf-8")
+    logger.info("Weekly report written: %s", output_path)
+    return output_path
+
+
 def main():
     args = parse_args()
 
@@ -1793,6 +2044,15 @@ def main():
     # --- Rebuild-HTML mode (no web fetches or LLM calls) ---
     if args.rebuild_html:
         rebuild_html_from_json(args, target_dates)
+        # Also regenerate weekly report if requested
+        if getattr(args, "weekly", False):
+            reports_dir = Path(args.output_dir)
+            logs_dir = Path(args.logs_dir) if args.logs_dir else reports_dir / "logs"
+            week_dates = [end_date - timedelta(days=i) for i in range(6, -1, -1)]
+            generate_weekly_report(args, reports_dir, week_dates, {})
+            write_log_viewer(reports_dir)
+            index_html = build_index(reports_dir, logs_dir)
+            (reports_dir / "index.html").write_text(index_html, encoding="utf-8")
         return
 
     # Load developers
@@ -1915,6 +2175,18 @@ def main():
         index_path = reports_dir / "index.html"
         index_path.write_text(index_html, encoding="utf-8")
         logger.info("Index updated: %s", index_path)
+
+        # --- Auto-generate weekly report on Sundays (weekday==6) ---
+        if target_date.weekday() == 6 or getattr(args, "weekly", False):
+            # Build the Mon–Sun window ending on target_date
+            week_dates = [target_date - timedelta(days=i) for i in range(6, -1, -1)]
+            weekly_path = generate_weekly_report(args, reports_dir, week_dates, llm_backends)
+            if weekly_path:
+                # Rebuild index to pick up the new weekly file
+                logger.info("Rebuilding index after weekly report...")
+                write_log_viewer(reports_dir)
+                index_html = build_index(reports_dir, logs_dir)
+                index_path.write_text(index_html, encoding="utf-8")
 
         # --- Publish to GitHub after every day (if requested) ---
         if publish:

@@ -158,11 +158,13 @@ def _deduplicate_patches(items: List[ActivityItem]) -> List[ActivityItem]:
         best = None
         total_patches = None
         for item in group:
+            # 0+ handles zero-padded cover letters: "00/17", "000/17", etc.
             cover_match = re.search(
-                r"\[(?:RFC\s+)?PATCH[^\]]*\s+0/(\d+)\]|\[RFC[^\]]*\b0/(\d+)\]",
+                r"\[(?:RFC\s+)?PATCH[^\]]*\s+0+/(\d+)\]|\[RFC[^\]]*\b0+/(\d+)\]",
                 item.subject, re.IGNORECASE)
+            # 0*1 handles zero-padded first patches: "01/17", "001/17", etc.
             first_match = re.search(
-                r"\[(?:RFC\s+)?PATCH[^\]]*\s+1/(\d+)\]|\[RFC[^\]]*\b1/(\d+)\]",
+                r"\[(?:RFC\s+)?PATCH[^\]]*\s+0*1/(\d+)\]|\[RFC[^\]]*\b0*1/(\d+)\]",
                 item.subject, re.IGNORECASE)
             if cover_match:
                 best = item

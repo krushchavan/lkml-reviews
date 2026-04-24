@@ -33,6 +33,7 @@ services:
       - GITHUB_REPO=${GITHUB_REPO:-}
       - GITHUB_BRANCH=${GITHUB_BRANCH:-main}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    restart: unless-stopped
     depends_on:
       - ollama
 

@@ -110,15 +110,42 @@ def _merge_reviews_across_dates(dates: dict) -> tuple[list[dict], str]:
 
     Also picks the best patch_summary (LLM preferred over heuristic).
 
+    message_id deduplication: when the same message_id appears in multiple
+    date buckets (e.g. because an old bucket was written before per-date
+    bucketing was added), only the *best* bucket is kept.  The best bucket
+    is the one where bucket_date == review.message_date (exact match);
+    if no exact match exists, the earliest bucket wins (first-seen semantics).
+
     Returns: (reviews_list, patch_summary)
     """
     sorted_dates = sorted(dates.keys())  # oldest → newest
+
+    # --- Pre-scan: for each message_id, determine the best bucket date -------
+    # Prefer the bucket where bucket_date == review.message_date (correctly
+    # bucketed entry).  Fall back to the first (oldest) bucket that contains
+    # the review so legacy entries still appear once.
+    best_bucket_for_mid: dict[str, str] = {}  # message_id → bucket_date
+    for date_str in sorted_dates:
+        for review in dates[date_str].get("reviews", []):
+            if not isinstance(review, dict):
+                continue
+            mid = str(review.get("message_id") or "").strip()
+            if not mid:
+                continue
+            msg_date = str(review.get("message_date") or "").strip()
+            if msg_date == date_str:
+                # Exact match — this bucket IS the correct home for this review.
+                best_bucket_for_mid[mid] = date_str
+            elif mid not in best_bucket_for_mid:
+                # No exact match yet — record the earliest bucket.
+                best_bucket_for_mid[mid] = date_str
 
     best_patch_summary = ""
     best_patch_source_rank = -1
 
     # Track the last-seen summary for each (author, reply_to) so we can skip
-    # exact duplicates carried forward across dates.
+    # exact duplicates carried forward across dates (for entries without a
+    # message_id where the message_id dedup path cannot apply).
     last_summary: dict[tuple, str] = {}
 
     # Result list — one entry per card
@@ -142,6 +169,13 @@ def _merge_reviews_across_dates(dates: dict) -> tuple[list[dict], str]:
         for review in date_data.get("reviews", []):
             if not isinstance(review, dict):
                 continue
+
+            # message_id-based dedup: skip if this bucket is not the best home
+            # for this review (a better-bucketed entry exists in another date).
+            mid = str(review.get("message_id") or "").strip()
+            if mid and best_bucket_for_mid.get(mid) != date_str:
+                continue
+
             author = str(review.get("author") or "").strip()
             reply_to = str(review.get("reply_to") or "").strip()
             dedup_key = (author, reply_to)
@@ -195,6 +229,10 @@ def _build_tree(reviews: list[dict]) -> list[dict]:
     Root nodes are blocks whose ``reply_to`` is empty or doesn't match any
     known author.  Children are sorted by ``first_seen`` date then by their
     original order so the tree reads chronologically top-to-bottom.
+
+    Cycle detection: if A replies to B and B replies to A, placing B as a child
+    of A would create a cycle (A is already a child of B).  In that case B is
+    promoted to a root node instead.
     """
     # Build a name → list[node] map (one author may have multiple blocks with
     # different reply_to values; we pick the first matching node as parent)
@@ -210,6 +248,24 @@ def _build_tree(reviews: list[dict]) -> list[dict]:
 
     roots: list[dict] = []
     placed = set()
+    parent_of: dict[int, int] = {}  # child_idx → parent_idx, for cycle detection
+
+    def _would_create_cycle(child_idx: int, proposed_parent_idx: int) -> bool:
+        """Return True if making child_idx a child of proposed_parent_idx creates a cycle.
+
+        Walks up the ancestor chain of proposed_parent_idx; if we encounter
+        child_idx the attachment would form a loop.
+        """
+        current = proposed_parent_idx
+        seen: set[int] = set()
+        while current is not None:
+            if current == child_idx:
+                return True
+            if current in seen:
+                break  # Guard against pre-existing cycles
+            seen.add(current)
+            current = parent_of.get(current)
+        return False
 
     for i, node in enumerate(nodes):
         reply_to = node.get("reply_to", "").lower().strip()
@@ -218,20 +274,36 @@ def _build_tree(reviews: list[dict]) -> list[dict]:
             placed.add(i)
             continue
 
-        # Find the best parent: the first node (by order) whose author name
-        # matches reply_to and is not the node itself
+        # Find the best parent: the most recent candidate (by message_date) whose
+        # author name matches reply_to, whose message_date is strictly before the
+        # current node's, is not the node itself, and would not create a cycle.
+        # Falling back to position order when message_dates are missing/equal.
+        my_date = node.get("message_date", "") or ""
         parent_indices = name_index.get(reply_to, [])
         parent = None
+        parent_idx = None
+        best_date = ""
         for pi in parent_indices:
-            if pi != i:
+            if pi == i:
+                continue
+            candidate_date = nodes[pi].get("message_date", "") or ""
+            # Temporal constraint: candidate must be strictly earlier (or same)
+            if my_date and candidate_date and candidate_date > my_date:
+                continue  # candidate is from the future — skip
+            if _would_create_cycle(i, pi):
+                continue
+            # Pick the most recent valid candidate
+            if parent is None or candidate_date > best_date:
                 parent = nodes[pi]
-                break
+                parent_idx = pi
+                best_date = candidate_date
 
         if parent is not None:
             parent["children"].append(node)
+            parent_of[i] = parent_idx
             placed.add(i)
         else:
-            # reply_to didn't resolve — treat as root
+            # reply_to didn't resolve, or would create a cycle — treat as root
             roots.append(node)
             placed.add(i)
 

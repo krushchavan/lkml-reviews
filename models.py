@@ -136,3 +136,20 @@ class DailyReport:
     generation_time_seconds: float = 0.0
     # List of (backend, model) pairs used, e.g. [("ollama", "llama3.1:8b")]
     llm_backends: list[tuple[str, str]] = field(default_factory=list)
+
+
+@dataclass
+class WeeklyReport:
+    """Aggregated report spanning a Mon–Sun calendar week."""
+    week_start: str                        # "2026-04-07"  (Monday)
+    week_end: str                          # "2026-04-13"  (Sunday)
+    iso_week: str                          # "2026-W15"
+    daily_reports: list[DailyReport] = field(default_factory=list)
+    # List of (backend, model) pairs used across the week's daily reports
+    llm_backends: list[tuple[str, str]] = field(default_factory=list)
+    # Aggregated totals (summed across all daily reports)
+    total_patches: int = 0
+    total_reviews: int = 0
+    total_acks: int = 0
+    # LLM-generated free-text narrative summarising the week's themes
+    narrative: str = ""

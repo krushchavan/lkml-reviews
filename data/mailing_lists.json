@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "last_updated": "2026-03-19T21:53:42Z",
+  "last_updated": "2026-04-23T23:04:42Z",
   "lists": {
     "linux-mm@kvack.org": {
       "address": "linux-mm@kvack.org",
@@ -20,8 +20,8 @@
       "address": "linux-fsdevel@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-18",
-      "last_seen": "2026-03-17",
-      "contribution_count": 136
+      "last_seen": "2026-04-22",
+      "contribution_count": 141
     },
     "io-uring@vger.kernel.org": {
       "address": "io-uring@vger.kernel.org",
@@ -34,15 +34,15 @@
       "address": "linux-kernel@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-18",
-      "last_seen": "2026-03-17",
-      "contribution_count": 381
+      "last_seen": "2026-04-22",
+      "contribution_count": 383
     },
     "linux-btrfs@vger.kernel.org": {
       "address": "linux-btrfs@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-02-18",
-      "last_seen": "2026-03-17",
-      "contribution_count": 126
+      "last_seen": "2026-04-22",
+      "contribution_count": 130
     },
     "linux-cxl@vger.kernel.org": {
       "address": "linux-cxl@vger.kernel.org",
@@ -125,8 +125,8 @@
       "address": "kvm@vger.kernel.org",
       "display_name": "",
       "first_seen": "2026-03-05",
-      "last_seen": "2026-03-05",
-      "contribution_count": 2
+      "last_seen": "2026-04-22",
+      "contribution_count": 4
     },
     "damon@lists.linux.dev": {
       "address": "damon@lists.linux.dev",
@@ -190,6 +190,13 @@
       "first_seen": "2026-03-17",
       "last_seen": "2026-03-17",
       "contribution_count": 30
+    },
+    "fuse-devel@lists.linux.dev": {
+      "address": "fuse-devel@lists.linux.dev",
+      "display_name": "",
+      "first_seen": "2026-04-22",
+      "last_seen": "2026-04-22",
+      "contribution_count": 16
     }
   }
 }

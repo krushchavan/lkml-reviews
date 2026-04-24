@@ -28,6 +28,121 @@ def _extract_date(filename: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _extract_iso_week(filename: str) -> str | None:
+    """Extract YYYY-WNN ISO week from a weekly report filename.
+
+    Example: 'week-2026-W15_ollama_llama3.1-8b.html' -> '2026-W15'
+    """
+    m = re.match(r"week-(\d{4}-W\d{2})", filename)
+    return m.group(1) if m else None
+
+
+def _build_weekly_rows(reports_dir: Path) -> tuple[list[str], int]:
+    """Scan for weekly report files and build table rows.
+
+    Returns (rows_html_list, weekly_report_count).
+    """
+    weekly_files: dict[str, list[str]] = defaultdict(list)  # iso_week → filenames
+    if reports_dir.exists():
+        for f in sorted(reports_dir.iterdir()):
+            if not f.is_file() or f.suffix != ".html":
+                continue
+            iso_week = _extract_iso_week(f.name)
+            if iso_week:
+                weekly_files[iso_week].append(f.name)
+
+    if not weekly_files:
+        return [], 0
+
+    rows: list[str] = []
+    total_count = 0
+
+    for iso_week in sorted(weekly_files.keys(), reverse=True):
+        files = weekly_files[iso_week]
+        total_count += len(files)
+
+        # Compute week date range from ISO week string (e.g. "2026-W15")
+        try:
+            year, wnum = iso_week.split("-W")
+            # ISO week Monday
+            week_start = datetime.strptime(f"{year}-W{int(wnum)}-1", "%Y-W%W-%w")
+            week_end   = datetime.strptime(f"{year}-W{int(wnum)}-0", "%Y-W%W-%w")
+            range_str  = f"{week_start.strftime('%b %-d')} \u2013 {week_end.strftime('%b %-d, %Y')}"
+        except (ValueError, AttributeError):
+            range_str = iso_week
+
+        # Sum counts from the 7 daily JSONs for this week
+        total_patches = total_reviews = total_acks = 0
+        daily_dir = reports_dir / "daily"
+        if daily_dir.exists():
+            try:
+                week_start_dt = datetime.strptime(f"{year}-W{int(wnum)}-1", "%Y-W%W-%w")
+                for i in range(7):
+                    from datetime import timedelta
+                    d = week_start_dt + timedelta(days=i)
+                    daily_json = daily_dir / f"{d.strftime('%Y-%m-%d')}.json"
+                    if daily_json.exists():
+                        try:
+                            data = json.loads(daily_json.read_text(encoding="utf-8"))
+                            total_patches += data.get("total_patches", 0)
+                            total_reviews += data.get("total_reviews", 0)
+                            total_acks    += data.get("total_acks", 0)
+                        except (json.JSONDecodeError, OSError):
+                            pass
+            except (ValueError, NameError):
+                pass
+
+        counts_html = (
+            f'<span class="weekly-count weekly-count-p">{total_patches}p</span>'
+            f'<span class="weekly-count weekly-count-r">{total_reviews}r</span>'
+            f'<span class="weekly-count weekly-count-a">{total_acks}a</span>'
+        ) if (total_patches or total_reviews or total_acks) else '<span class="none">--</span>'
+
+        num_files = len(files)
+        for i, filename in enumerate(files):
+            # Build label: strip "week-YYYY-WNN_" prefix, format like daily
+            label = filename.removesuffix(".html")
+            m2 = re.match(r"week-\d{4}-W\d{2}[_-]?(.*)", label)
+            if m2 and m2.group(1):
+                raw = m2.group(1)
+                parts = []
+                for seg in re.split(r"(ollama_|anthropic_)", raw):
+                    if seg in ("ollama_", "anthropic_"):
+                        parts.append(seg.rstrip("_") + "/")
+                    elif seg:
+                        cleaned = seg.rstrip("_")
+                        if parts:
+                            parts[-1] += cleaned
+                        else:
+                            parts.append(cleaned)
+                label_text = " + ".join(parts) if parts else raw
+            else:
+                label_text = "Heuristic"
+
+            report_link = f'<a href="{html.escape(filename)}" class="report-link weekly-report-link">{html.escape(label_text)}</a>'
+
+            if i == 0:
+                rowspan = f' rowspan="{num_files}"' if num_files > 1 else ""
+                rows.append(
+                    f'<tr>'
+                    f'<td class="date-cell weekly-week-cell"{rowspan}>'
+                    f'{html.escape(range_str)}'
+                    f'<span class="weekly-iso-badge">{html.escape(iso_week)}</span>'
+                    f'</td>'
+                    f'<td class="reports-cell">{report_link}</td>'
+                    f'<td class="weekly-counts-cell"{rowspan}>{counts_html}</td>'
+                    f'</tr>'
+                )
+            else:
+                rows.append(
+                    f'<tr>'
+                    f'<td class="reports-cell">{report_link}</td>'
+                    f'</tr>'
+                )
+
+    return rows, total_count
+
+
 def _report_label(filename: str) -> str:
     """Build a human-readable label for a report file."""
     # Strip .html extension
@@ -336,6 +451,14 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
     total_reports = sum(len(v) for v in reports_by_date.values())
     total_logs = len(matched_logs)
 
+    # Build weekly rows
+    weekly_rows, weekly_count = _build_weekly_rows(reports_dir)
+    weekly_rows_html = "\n            ".join(weekly_rows)
+    weekly_empty_html = (
+        '<tr><td colspan="3" class="weekly-empty">No weekly reports yet.</td></tr>'
+        if not weekly_rows else ""
+    )
+
     # Build run history section
     run_history_html = _build_run_history_html(logs_dir)
 
@@ -373,6 +496,7 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             display: flex;
             gap: 24px;
             margin-bottom: 24px;
+            flex-wrap: wrap;
         }}
         .stat {{
             background: #fff;
@@ -390,6 +514,39 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             font-size: 0.85em;
             color: #888;
         }}
+        /* ── CSS-only tabs ── */
+        .tab-inputs {{ display: none; }}
+        .tab-bar {{
+            display: flex;
+            gap: 0;
+            margin-bottom: 0;
+            border-bottom: 2px solid #e1e4e8;
+        }}
+        .tab-label {{
+            padding: 10px 22px;
+            font-size: 0.92em;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-bottom: -2px;
+            transition: color 0.15s, background 0.15s;
+            user-select: none;
+        }}
+        .tab-label:hover {{ color: #1a1a1a; background: #f0f4f8; }}
+        #tab-daily:checked  ~ .tab-bar label[for="tab-daily"],
+        #tab-weekly:checked ~ .tab-bar label[for="tab-weekly"] {{
+            color: #1a1a1a;
+            background: #fff;
+            border-color: #e1e4e8;
+            border-bottom-color: #fff;
+        }}
+        .tab-panel {{ display: none; padding-top: 20px; }}
+        #tab-daily:checked  ~ .tab-panels #panel-daily  {{ display: block; }}
+        #tab-weekly:checked ~ .tab-panels #panel-weekly {{ display: block; }}
+        /* ── Tables ── */
         table {{
             width: 100%;
             background: #fff;
@@ -514,6 +671,13 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         .report-link:hover {{
             background: #bbdefb;
         }}
+        .weekly-report-link {{
+            background: #e8f5e9;
+            color: #2e7d32;
+        }}
+        .weekly-report-link:hover {{
+            background: #c8e6c9;
+        }}
         .log-link {{
             display: inline-block;
             padding: 2px 10px;
@@ -532,6 +696,43 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
             font-size: 0.82em;
             font-style: italic;
         }}
+        .weekly-empty {{
+            color: #aaa;
+            font-style: italic;
+            font-size: 0.88em;
+            text-align: center;
+            padding: 24px;
+        }}
+        .weekly-week-cell {{
+            width: 220px;
+            font-weight: 600;
+        }}
+        .weekly-iso-badge {{
+            display: inline-block;
+            font-size: 0.7em;
+            background: #f0f4f8;
+            color: #5a6a7a;
+            border-radius: 4px;
+            padding: 1px 5px;
+            margin-left: 6px;
+            font-weight: 500;
+            vertical-align: middle;
+        }}
+        .weekly-counts-cell {{
+            white-space: nowrap;
+        }}
+        .weekly-count {{
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 0.78em;
+            font-weight: 600;
+            margin-right: 4px;
+        }}
+        .weekly-count-p {{ background: #e6ffed; color: #22863a; }}
+        .weekly-count-r {{ background: #ddf4ff; color: #0969da; }}
+        .weekly-count-a {{ background: #fff8c5; color: #9a6700; }}
+        /* ── History / misc ── */
         .history-details {{
             margin-top: 32px;
         }}
@@ -629,7 +830,11 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         </div>
         <div class="stat">
             <div class="stat-number">{total_reports}</div>
-            <div class="stat-label">Reports</div>
+            <div class="stat-label">Daily Reports</div>
+        </div>
+        <div class="stat">
+            <div class="stat-number">{weekly_count}</div>
+            <div class="stat-label">Weekly Reports</div>
         </div>
         <div class="stat">
             <div class="stat-number">{total_logs}</div>
@@ -637,20 +842,48 @@ def build_index(reports_dir: Path, logs_dir: Path) -> str:
         </div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Report</th>
-                <th>Log</th>
-            </tr>
-        </thead>
-        <tbody>
-            {rows_html}
-        </tbody>
-    </table>
+    <!-- CSS-only tab system: inputs must precede the tab bar and panels -->
+    <input type="radio" name="lkml-tab" id="tab-daily" class="tab-inputs" checked>
+    <input type="radio" name="lkml-tab" id="tab-weekly" class="tab-inputs">
 
-    {run_history_html}
+    <div class="tab-bar">
+        <label for="tab-daily" class="tab-label">&#128197; Daily Reports</label>
+        <label for="tab-weekly" class="tab-label">&#128200; Weekly Reports</label>
+    </div>
+
+    <div class="tab-panels">
+        <div class="tab-panel" id="panel-daily">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Report</th>
+                        <th>Log</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+            {run_history_html}
+        </div>
+
+        <div class="tab-panel" id="panel-weekly">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Week</th>
+                        <th>Report</th>
+                        <th>Activity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {weekly_rows_html}
+                    {weekly_empty_html}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <footer>LKML Daily Activity Tracker</footer>
 </body>
